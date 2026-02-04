@@ -2,8 +2,17 @@ import base64
 import hashlib
 import logging
 import os
+import sys
 
 from fastapi import FastAPI, HTTPException, Request
+
+# Force INFO logs to stdout so Cloud Run captures them
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(levelname)s %(message)s",
+)
+logger = logging.getLogger("invoice_ingest")
 
 app = FastAPI()
 
@@ -36,13 +45,13 @@ async def postmark_inbound(req: Request):
     payload = await req.json()
 
     attachments = payload.get("Attachments", []) or []
-    logging.info("Inbound: attachments=%s", len(attachments))
+    logger.info("Inbound: attachments=%s", len(attachments))
 
-    # Log useful routing info (safe / non-sensitive)
+    # Helpful (non-sensitive) routing context for debugging
     from_email = (payload.get("FromFull") or {}).get("Email") or payload.get("From")
     subject = payload.get("Subject")
     to_email = payload.get("To")
-    logging.info("Inbound: from=%s to=%s subject=%s", from_email, to_email, subject)
+    logger.info("Inbound: from=%s to=%s subject=%s", from_email, to_email, subject)
 
     # Pick first PDF attachment
     pdfs = [
@@ -53,7 +62,7 @@ async def postmark_inbound(req: Request):
     if not pdfs:
         names = [a.get("Name") for a in attachments]
         ctypes = [a.get("ContentType") for a in attachments]
-        logging.info("Inbound: no PDF found. names=%s content_types=%s", names, ctypes)
+        logger.info("Inbound: no PDF found. names=%s content_types=%s", names, ctypes)
         return {"status": "no_pdf", "attachment_names": names}
 
     pdf = pdfs[0]
@@ -62,23 +71,19 @@ async def postmark_inbound(req: Request):
     # Decode PDF bytes from Postmark base64 attachment content
     try:
         pdf_bytes = base64.b64decode(pdf["Content"])
-    except Exception as e:
-        logging.exception("Inbound: failed to decode PDF content")
-        raise HTTPException(400, f"Bad PDF attachment encoding: {e}")
+    except Exception:
+        logger.exception("Inbound: failed to decode PDF content")
+        raise HTTPException(400, "Bad PDF attachment encoding")
 
     pdf_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
-    logging.info(
+    logger.info(
         "Inbound: pdf=%s size=%s sha256=%s",
         pdf_name,
         len(pdf_bytes),
         pdf_sha256,
     )
 
-    # TODO (next step): call your extractor here and log the parsed invoice fields.
-    # parsed = extract_invoice_from_pdf(pdf_bytes)
-    # logging.info("Parsed: %s", parsed)
-
-    # For now: prove the pipeline works end-to-end.
+    # Next step will be: call your extractor here and log parsed fields.
     return {
         "status": "ok",
         "pdf_name": pdf_name,
