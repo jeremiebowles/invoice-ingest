@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 
 from app.parsers.clf import parse_clf
 from app.pdf_text import extract_text_from_pdf
-from app.sage_client import post_purchase_credit_note, post_purchase_invoice
+from app.sage_client import check_sage_auth, post_purchase_credit_note, post_purchase_invoice
 
 
 logging.basicConfig(level=logging.INFO)
@@ -147,6 +147,13 @@ def _text_looks_like_clf(text: str) -> bool:
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/sage/health")
+async def sage_health() -> Dict[str, Any]:
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    return check_sage_auth()
 
 
 @app.post("/postmark/inbound")

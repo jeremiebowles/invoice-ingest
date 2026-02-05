@@ -40,6 +40,14 @@ def _refresh_access_token() -> str:
     return resp.json()["access_token"]
 
 
+def check_sage_auth() -> Dict[str, Any]:
+    try:
+        access_token = _refresh_access_token()
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
+    return {"status": "ok", "access_token": access_token[:10] + "..."}
+
+
 def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
     if invoice.ledger_account == 5001:
         return _get_env("SAGE_LEDGER_5001_ID")
