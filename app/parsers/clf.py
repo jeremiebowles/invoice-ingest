@@ -186,6 +186,32 @@ def _extract_total_gbp_incl_vat(text: str) -> Optional[float]:
     return None
 
 
+def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    total_excl = None
+    vat_amount = None
+    total_incl = None
+
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    for line in lines:
+        if total_incl is None and re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                total_incl = values[0]
+            continue
+        if vat_amount is None and re.search(r"VAT\s*Amount", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                vat_amount = values[0]
+            continue
+        if total_excl is None and re.search(r"Total\s*GBP\s*Excl\.?\s*VAT", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                total_excl = values[0]
+            continue
+
+    return total_excl, vat_amount, total_incl
+
+
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -226,7 +252,10 @@ def parse_clf(text: str) -> InvoiceData:
     vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net Amount", "Net"])
     nonvat_net = _extract_amount(text, ["Non-VAT", "Non VAT", "Zero Rated", "Non-Vatable"])
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
-    total_incl_vat = _extract_total_gbp_incl_vat(text)
+    total_excl_vat, totals_vat_amount, total_incl_vat = _extract_totals_block(text)
+    total_incl_vat = total_incl_vat or _extract_total_gbp_incl_vat(text)
+    if vat_amount is None and totals_vat_amount is not None:
+        vat_amount = totals_vat_amount
 
     if vat_net is None or nonvat_net is None or vat_amount is None:
         (
@@ -257,8 +286,12 @@ def parse_clf(text: str) -> InvoiceData:
         warnings.append("Total GBP Incl. VAT not found")
     elif not approx_equal(subtotal, total_incl_vat):
         warnings.append("Total GBP Incl. VAT does not reconcile")
-    elif not approx_equal(subtotal, total):
-        warnings.append("Totals do not reconcile")
+
+    if total_excl_vat is not None and not approx_equal(vat_net + nonvat_net, total_excl_vat):
+        warnings.append("Total GBP Excl. VAT does not reconcile")
+
+    if totals_vat_amount is not None and not approx_equal(vat_amount, totals_vat_amount):
+        warnings.append("VAT Amount does not reconcile")
 
     return InvoiceData(
         supplier="CLF",
