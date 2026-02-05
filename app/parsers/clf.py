@@ -57,6 +57,7 @@ def _extract_invoice_number(text: str) -> str:
 def _extract_invoice_date(text: str) -> Optional[str]:
     patterns = [
         r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
+        r"Posting\s*Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
         r"Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
     ]
     match = first_match(patterns, text, flags=re.IGNORECASE)
@@ -86,6 +87,19 @@ def _extract_terms_days(text: str) -> Optional[int]:
     return None
 
 
+def _extract_postcode_from_lines(text: str) -> Optional[str]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        if re.search(r"Deliver\\s*To", line, flags=re.IGNORECASE):
+            for offset in range(0, 8):
+                if idx + offset >= len(lines):
+                    break
+                match = _POSTCODE_RE.search(lines[idx + offset])
+                if match:
+                    return _normalize_postcode(match.group(0))
+    return None
+
+
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -93,17 +107,24 @@ def parse_clf(text: str) -> InvoiceData:
     postcode = None
     ledger_account = None
 
-    if not deliver_block:
-        warnings.append("Deliver To block not found")
-    else:
+    if deliver_block:
         postcode_match = _POSTCODE_RE.search(deliver_block)
         if postcode_match:
             postcode = _normalize_postcode(postcode_match.group(0))
-            ledger_account = _LEDGER_MAP.get(postcode)
-            if ledger_account is None:
-                warnings.append(f"Unknown Deliver To postcode: {postcode}")
-        else:
-            warnings.append("Deliver To postcode not found")
+    if not postcode:
+        postcode = _extract_postcode_from_lines(text or "")
+    if not postcode:
+        for known in _LEDGER_MAP.keys():
+            if known.replace(" ", "") in (text or "").upper().replace(" ", ""):
+                postcode = known
+                break
+
+    if postcode:
+        ledger_account = _LEDGER_MAP.get(postcode)
+        if ledger_account is None:
+            warnings.append(f"Unknown Deliver To postcode: {postcode}")
+    else:
+        warnings.append("Deliver To postcode not found")
 
     invoice_number = _extract_invoice_number(text or "")
     invoice_date_str = _extract_invoice_date(text or "")
@@ -119,10 +140,10 @@ def parse_clf(text: str) -> InvoiceData:
         if terms_days and invoice_date:
             due_date = invoice_date + timedelta(days=terms_days)
 
-    vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net"])
+    vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net Amount", "Net"])
     nonvat_net = _extract_amount(text, ["Non-VAT", "Non VAT", "Zero Rated", "Non-Vatable"])
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
-    total = _extract_amount(text, ["Total", "Amount Due", "Balance Due"])
+    total = _extract_amount(text, ["Total Amount", "Total", "Amount Due", "Balance Due", "Invoice Total"])
 
     if vat_net is None:
         vat_net = 0.0
