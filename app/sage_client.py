@@ -50,10 +50,10 @@ def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
     return None
 
 
-def _get_tax_rate_id(invoice: InvoiceData) -> str:
-    if invoice.vat_amount and invoice.vat_amount > 0:
-        return _get_env("SAGE_TAX_STANDARD_ID") or "GB_STANDARD"
-    return _get_env("SAGE_TAX_ZERO_ID") or "GB_ZERO"
+def _get_tax_rate_ids() -> tuple[str, str]:
+    standard = _get_env("SAGE_TAX_STANDARD_ID") or "GB_STANDARD"
+    zero = _get_env("SAGE_TAX_ZERO_ID") or "GB_ZERO"
+    return standard, zero
 
 
 def _compute_due_date(invoice_date: date) -> date:
@@ -71,10 +71,46 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
         raise RuntimeError("Missing Sage ledger account mapping")
 
     access_token = _refresh_access_token()
-    tax_rate_id = _get_tax_rate_id(invoice)
+    tax_standard_id, tax_zero_id = _get_tax_rate_ids()
 
-    net_amount = invoice.vat_net + invoice.nonvat_net
+    vat_net = round(invoice.vat_net, 2)
+    nonvat_net = round(invoice.nonvat_net, 2)
+    vat_amount = round(invoice.vat_amount, 2)
+    net_amount = round(vat_net + nonvat_net, 2)
+    total_amount = round(net_amount + vat_amount, 2)
     due_date = _compute_due_date(invoice.invoice_date)
+
+    invoice_lines = []
+    if vat_net > 0:
+        invoice_lines.append(
+            {
+                "description": invoice.description or "Purchases",
+                "ledger_account_id": ledger_account_id,
+                "quantity": 1,
+                "unit_price": vat_net,
+                "net_amount": vat_net,
+                "tax_rate_id": tax_standard_id,
+                "tax_amount": vat_amount,
+                "total_amount": round(vat_net + vat_amount, 2),
+            }
+        )
+
+    if nonvat_net > 0:
+        invoice_lines.append(
+            {
+                "description": invoice.description or "Purchases",
+                "ledger_account_id": ledger_account_id,
+                "quantity": 1,
+                "unit_price": nonvat_net,
+                "net_amount": nonvat_net,
+                "tax_rate_id": tax_zero_id,
+                "tax_amount": 0,
+                "total_amount": nonvat_net,
+            }
+        )
+
+    if not invoice_lines:
+        raise RuntimeError("Invoice has no line amounts to post")
 
     payload = {
         "purchase_invoice": {
@@ -82,17 +118,11 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
             "date": invoice.invoice_date.isoformat(),
             "due_date": due_date.isoformat(),
             "reference": invoice.supplier_reference,
-            "invoice_lines": [
-                {
-                    "description": invoice.description or "Purchases",
-                    "ledger_account_id": ledger_account_id,
-                    "quantity": 1,
-                    "unit_price": round(net_amount, 2),
-                    "tax_rate_id": tax_rate_id,
-                    "tax_rate": {"id": tax_rate_id},
-                    "currency_tax_amount": round(invoice.vat_amount, 2),
-                }
-            ],
+            "invoice_number": invoice.supplier_reference,
+            "net_amount": net_amount,
+            "tax_amount": vat_amount,
+            "total_amount": total_amount,
+            "invoice_lines": invoice_lines,
         }
     }
 
@@ -102,7 +132,7 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
             "Authorization": f"Bearer {access_token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "X-Business": business_id,
+            "X-Session-Company-Id": business_id,
         },
         json=payload,
         timeout=30,
