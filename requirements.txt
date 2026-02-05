@@ -1,2 +1,4 @@
 fastapi[standard]==0.116.1
 uvicorn==0.35.0
+pdfplumber==0.11.4
+python-dateutil==2.9.0.post0
