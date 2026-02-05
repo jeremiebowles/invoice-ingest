@@ -127,6 +127,18 @@ def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, An
     return None
 
 
+def _extract_sender_email(payload: Dict[str, Any]) -> Optional[str]:
+    from_full = payload.get("FromFull") or {}
+    if isinstance(from_full, dict):
+        email = from_full.get("Email")
+        if isinstance(email, str) and email.strip():
+            return email.strip().lower()
+    from_header = payload.get("From")
+    if isinstance(from_header, str) and from_header.strip():
+        return from_header.strip().lower()
+    return None
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -164,6 +176,11 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     text = extract_text_from_pdf(pdf_bytes)
     _log_pdf_text(text)
+
+    sender_email = _extract_sender_email(payload) or ""
+    is_clf_sender = sender_email.endswith("@clfdistribution.com")
+    if not is_clf_sender:
+        logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
 
     invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))

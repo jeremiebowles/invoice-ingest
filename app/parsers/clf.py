@@ -68,7 +68,7 @@ def _extract_credit_number(text: str) -> Optional[str]:
 
 def _extract_invoice_date(text: str) -> Optional[str]:
     match = re.search(
-        r"(Posting\s*Date|Posting/Tax\s*Point\s*Date)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        r"(Posting\s*Date|Posting/Tax\s*Point\s*Date|Posting\s*Tax\s*Point\s*Dat)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
         text or "",
         flags=re.IGNORECASE,
     )
@@ -77,7 +77,7 @@ def _extract_invoice_date(text: str) -> Optional[str]:
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     for line in lines:
-        if re.search(r"Posting\s*Date|Posting/Tax\s*Point\s*Date", line, flags=re.IGNORECASE):
+        if re.search(r"Posting\s*Date|Posting/Tax\s*Point\s*Date|Posting\s*Tax\s*Point\s*Dat", line, flags=re.IGNORECASE):
             date_match = _DATE_RE.search(line)
             if date_match:
                 return date_match.group(1)
@@ -86,6 +86,7 @@ def _extract_invoice_date(text: str) -> Optional[str]:
         r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Posting\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Posting/Tax\s*Point\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
+        r"Posting\s*Tax\s*Point\s*Dat\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
     ]
     match = first_match(patterns, text, flags=re.IGNORECASE)
@@ -176,6 +177,30 @@ def _extract_vat_breakdown(
                     vat_amount = values[-1] if len(values) >= 2 else vat_amount
                 elif line.startswith("Z"):
                     nonvat_net = values[0]
+
+    if vat_net is None and nonvat_net is None:
+        vat_total = 0.0
+        nonvat_total = 0.0
+        vat_found = False
+        nonvat_found = False
+        for line in lines:
+            code_match = re.search(r"\b([SZ])\b", line)
+            if not code_match:
+                continue
+            values = _extract_money_values(line)
+            if not values:
+                continue
+            amount = values[-1]
+            if code_match.group(1) == "S":
+                vat_total += amount
+                vat_found = True
+            else:
+                nonvat_total += amount
+                nonvat_found = True
+        if vat_found:
+            vat_net = vat_total
+        if nonvat_found:
+            nonvat_net = nonvat_total
 
     return vat_net, nonvat_net, vat_amount
 
