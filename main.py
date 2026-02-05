@@ -14,6 +14,7 @@ from app.pdf_text import extract_text_from_pdf
 from app.sage_client import (
     check_sage_auth,
     debug_refresh,
+    debug_refresh_token,
     exchange_auth_code,
     post_purchase_credit_note,
     post_purchase_invoice,
@@ -170,6 +171,26 @@ async def sage_test_refresh(request: Request) -> Dict[str, Any]:
     if not SAGE_ENABLED:
         return {"status": "disabled"}
     return debug_refresh()
+
+
+@app.post("/sage/test-refresh-token")
+async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
+
+    refresh_token = payload.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh_token")
+
+    return debug_refresh_token(str(refresh_token).strip())
 
 
 @app.post("/sage/post")
