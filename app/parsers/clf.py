@@ -10,6 +10,7 @@ from app.parse_utils import approx_equal, first_match, parse_date, parse_money
 
 _POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})\b")
+_MONEY_CAPTURE_RE = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[-+]?\d+(?:\.\d{2})")
 
 _LEDGER_MAP = {
     "CF10 1AE": 5001,
@@ -126,6 +127,44 @@ def _find_known_postcode(text: str) -> Optional[str]:
     return None
 
 
+def _extract_money_values(line: str) -> list[float]:
+    values: list[float] = []
+    for match in _MONEY_CAPTURE_RE.findall(line.replace("£", "").replace("GBP", "")):
+        value = parse_money(match)
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _extract_vat_breakdown(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    vat_net = None
+    nonvat_net = None
+    vat_amount = None
+
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    start_idx = 0
+    for idx, line in enumerate(lines):
+        if re.search(r"VAT\\s*Identifier", line, flags=re.IGNORECASE):
+            start_idx = idx + 1
+            break
+
+    for line in lines[start_idx:]:
+        if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
+            break
+        if re.search(r"\\bS\\b", line):
+            values = _extract_money_values(line)
+            if values:
+                vat_net = values[0]
+                if len(values) > 1:
+                    vat_amount = values[-1]
+        if re.search(r"\\bZ\\b", line):
+            values = _extract_money_values(line)
+            if values:
+                nonvat_net = values[0]
+
+    return vat_net, nonvat_net, vat_amount
+
+
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -166,7 +205,19 @@ def parse_clf(text: str) -> InvoiceData:
     vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net Amount", "Net"])
     nonvat_net = _extract_amount(text, ["Non-VAT", "Non VAT", "Zero Rated", "Non-Vatable"])
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
-    total = _extract_amount(text, ["Total Amount", "Total", "Amount Due", "Balance Due", "Invoice Total"])
+    total = _extract_amount(
+        text,
+        ["Total GBP Incl. VAT", "Total Amount", "Total", "Amount Due", "Balance Due", "Invoice Total"],
+    )
+
+    if vat_net is None or nonvat_net is None or vat_amount is None:
+        vat_net_from_breakdown, nonvat_net_from_breakdown, vat_amount_from_breakdown = _extract_vat_breakdown(text)
+        if vat_net is None:
+            vat_net = vat_net_from_breakdown
+        if nonvat_net is None:
+            nonvat_net = nonvat_net_from_breakdown
+        if vat_amount is None:
+            vat_amount = vat_amount_from_breakdown
 
     if vat_net is None:
         vat_net = 0.0

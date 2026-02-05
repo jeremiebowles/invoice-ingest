@@ -154,6 +154,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     text = extract_text_from_pdf(pdf_bytes)
     logger.info("Extracted text head: %s", text[:800])
+    logger.info("Extracted text tail: %s", text[-1200:])
 
     invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
