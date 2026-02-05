@@ -148,7 +148,7 @@ def _extract_vat_breakdown(
     vat_net = None
     nonvat_net = None
     vat_amount = None
-    total = None
+    total_line_amount = None
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     start_idx = 0
@@ -158,16 +158,10 @@ def _extract_vat_breakdown(
             break
 
     for line in lines[start_idx:]:
-        if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
-            values = _extract_money_values(line)
-            if values:
-                total = values[0]
-            break
-
         if re.match(r"^Total\\b", line, flags=re.IGNORECASE):
             values = _extract_money_values(line)
             if values:
-                total = values[0]
+                total_line_amount = values[0]
             break
 
         if re.match(r"^S\\b", line):
@@ -179,6 +173,10 @@ def _extract_vat_breakdown(
             values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
                 nonvat_net = values[0]
+
+    total = None
+    if total_line_amount is not None:
+        total = total_line_amount + (vat_amount or 0.0)
 
     return vat_net, nonvat_net, vat_amount, total
 
@@ -225,7 +223,7 @@ def parse_clf(text: str) -> InvoiceData:
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
     total = _extract_amount(
         text,
-        ["Total GBP Incl. VAT", "Total Amount", "Total", "Amount Due", "Balance Due", "Invoice Total"],
+        ["Total GBP Incl. VAT", "Total Amount", "Amount Due", "Balance Due", "Invoice Total"],
     )
 
     if vat_net is None or nonvat_net is None or vat_amount is None or total is None:
