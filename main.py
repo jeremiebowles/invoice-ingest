@@ -139,6 +139,11 @@ def _extract_sender_email(payload: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _text_looks_like_clf(text: str) -> bool:
+    normalized = (text or "").lower()
+    return "clf distribution" in normalized or "clf distribution ltd" in normalized
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -179,6 +184,9 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     sender_email = _extract_sender_email(payload) or ""
     is_clf_sender = sender_email.endswith("@clfdistribution.com")
+    if not is_clf_sender and _text_looks_like_clf(text):
+        is_clf_sender = True
+        logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
     if not is_clf_sender:
         logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
 
