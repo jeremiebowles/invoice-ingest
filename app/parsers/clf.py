@@ -144,11 +144,10 @@ def _strip_vat_rate(values: list[float]) -> list[float]:
 
 def _extract_vat_breakdown(
     text: str,
-) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+) -> tuple[Optional[float], Optional[float], Optional[float]]:
     vat_net = None
     nonvat_net = None
     vat_amount = None
-    total_line_amount = None
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     start_idx = 0
@@ -158,12 +157,6 @@ def _extract_vat_breakdown(
             break
 
     for line in lines[start_idx:]:
-        if re.match(r"^Total\\b", line, flags=re.IGNORECASE):
-            values = _extract_money_values(line)
-            if values:
-                total_line_amount = values[0]
-            break
-
         if re.match(r"^S\\b", line):
             values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
@@ -174,11 +167,17 @@ def _extract_vat_breakdown(
             if len(values) >= 2:
                 nonvat_net = values[0]
 
-    total = None
-    if total_line_amount is not None:
-        total = total_line_amount + (vat_amount or 0.0)
+    return vat_net, nonvat_net, vat_amount
 
-    return vat_net, nonvat_net, vat_amount, total
+
+def _extract_total_gbp_incl_vat(text: str) -> Optional[float]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    for line in lines:
+        if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                return values[0]
+    return None
 
 
 def parse_clf(text: str) -> InvoiceData:
@@ -221,17 +220,13 @@ def parse_clf(text: str) -> InvoiceData:
     vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net Amount", "Net"])
     nonvat_net = _extract_amount(text, ["Non-VAT", "Non VAT", "Zero Rated", "Non-Vatable"])
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
-    total = _extract_amount(
-        text,
-        ["Total GBP Incl. VAT", "Total Amount", "Amount Due", "Balance Due", "Invoice Total"],
-    )
+    total_incl_vat = _extract_total_gbp_incl_vat(text)
 
-    if vat_net is None or nonvat_net is None or vat_amount is None or total is None:
+    if vat_net is None or nonvat_net is None or vat_amount is None:
         (
             vat_net_from_breakdown,
             nonvat_net_from_breakdown,
             vat_amount_from_breakdown,
-            total_from_breakdown,
         ) = _extract_vat_breakdown(text)
         if vat_net is None:
             vat_net = vat_net_from_breakdown
@@ -239,8 +234,6 @@ def parse_clf(text: str) -> InvoiceData:
             nonvat_net = nonvat_net_from_breakdown
         if vat_amount is None:
             vat_amount = vat_amount_from_breakdown
-        if total_from_breakdown is not None:
-            total = total_from_breakdown
 
     if vat_net is None:
         vat_net = 0.0
@@ -251,12 +244,14 @@ def parse_clf(text: str) -> InvoiceData:
     if vat_amount is None:
         vat_amount = 0.0
         warnings.append("VAT amount not found")
-    if total is None:
-        total = vat_net + nonvat_net + vat_amount
-        warnings.append("Total amount not found")
-
     subtotal = vat_net + nonvat_net + vat_amount
-    if not approx_equal(subtotal, total):
+    total = total_incl_vat if total_incl_vat is not None else subtotal
+
+    if total_incl_vat is None:
+        warnings.append("Total GBP Incl. VAT not found")
+    elif not approx_equal(subtotal, total_incl_vat):
+        warnings.append("Total GBP Incl. VAT does not reconcile")
+    elif not approx_equal(subtotal, total):
         warnings.append("Totals do not reconcile")
 
     return InvoiceData(
