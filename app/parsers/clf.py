@@ -319,7 +319,7 @@ def parse_clf(text: str) -> InvoiceData:
 
     if total_incl_vat is None and total_gbp is None:
         warnings.append("Total GBP Incl. VAT not found")
-    elif not approx_equal(subtotal, total_incl_vat):
+    elif total_incl_vat is not None and not approx_equal(subtotal, total_incl_vat):
         warnings.append("Total GBP Incl. VAT does not reconcile")
 
     if total_excl_vat is not None and not approx_equal(vat_net + nonvat_net, total_excl_vat):
