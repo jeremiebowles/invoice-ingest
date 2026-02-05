@@ -200,6 +200,11 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                 sage_result = post_purchase_credit_note(invoice)
             else:
                 sage_result = post_purchase_invoice(invoice)
+            if isinstance(sage_result, dict):
+                if sage_result.get("id"):
+                    logger.info("Sage created id: %s", sage_result.get("id"))
+                elif sage_result.get("status") == "skipped":
+                    logger.info("Sage post skipped: %s", sage_result)
         except Exception as exc:
             logger.exception("Sage post failed: %s", exc)
             sage_result = {"status": "error", "message": str(exc)}
