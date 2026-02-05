@@ -381,6 +381,12 @@ def parse_clf(text: str) -> InvoiceData:
         nonvat_net = abs(nonvat_net)
         vat_amount = abs(vat_amount)
         total = abs(total)
+        if vat_net == 0 and vat_amount == 0 and nonvat_net > 0:
+            warnings = [
+                w
+                for w in warnings
+                if w not in {"VAT net amount not found", "VAT amount not found"}
+            ]
 
     return InvoiceData(
         supplier="CLF",
