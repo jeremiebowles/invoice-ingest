@@ -136,6 +136,12 @@ def _extract_money_values(line: str) -> list[float]:
     return values
 
 
+def _strip_vat_rate(values: list[float]) -> list[float]:
+    if len(values) >= 3 and values[0] <= 100 and values[0].is_integer():
+        return values[1:]
+    return values
+
+
 def _extract_vat_breakdown(
     text: str,
 ) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
@@ -165,14 +171,14 @@ def _extract_vat_breakdown(
             break
 
         if re.match(r"^S\\b", line):
-            values = _extract_money_values(line)
+            values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
-                vat_net = values[1]
-                vat_amount = values[-1] if len(values) >= 3 else vat_amount
+                vat_net = values[0]
+                vat_amount = values[-1] if len(values) >= 2 else vat_amount
         if re.match(r"^Z\\b", line):
-            values = _extract_money_values(line)
+            values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
-                nonvat_net = values[1]
+                nonvat_net = values[0]
 
     return vat_net, nonvat_net, vat_amount, total
 
@@ -235,7 +241,7 @@ def parse_clf(text: str) -> InvoiceData:
             nonvat_net = nonvat_net_from_breakdown
         if vat_amount is None:
             vat_amount = vat_amount_from_breakdown
-        if total is None:
+        if total_from_breakdown is not None:
             total = total_from_breakdown
 
     if vat_net is None:
