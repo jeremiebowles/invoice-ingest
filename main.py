@@ -11,7 +11,12 @@ from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
-from app.sage_client import check_sage_auth, post_purchase_credit_note, post_purchase_invoice
+from app.sage_client import (
+    check_sage_auth,
+    exchange_auth_code,
+    post_purchase_credit_note,
+    post_purchase_invoice,
+)
 
 
 logging.basicConfig(level=logging.INFO)
@@ -220,6 +225,47 @@ async def sage_post(request: Request) -> Dict[str, Any]:
         logger.info("Sage created id: %s", sage_result.get("id"))
 
     return {"status": "ok", "sage": sage_result}
+
+
+@app.get("/sage/auth-url")
+async def sage_auth_url(request: Request) -> Dict[str, str]:
+    _check_basic_auth(request)
+    client_id = os.getenv("SAGE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Missing SAGE_CLIENT_ID")
+    url = (
+        "https://www.sageone.com/oauth2/auth/central"
+        "?filter=apiv3.1"
+        "&response_type=code"
+        f"&client_id={client_id.replace('/', '%2F')}"
+        "&redirect_uri=https%3A%2F%2Foauth.pstmn.io%2Fv1%2Fbrowser-callback"
+        "&scope=full_access"
+        "&state=123"
+    )
+    return {"url": url}
+
+
+@app.post("/sage/exchange")
+async def sage_exchange(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
+
+    code = payload.get("code")
+    if not code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code")
+
+    tokens = exchange_auth_code(str(code))
+    return {
+        "status": "ok",
+        "refresh_token": tokens.get("refresh_token"),
+        "expires_in": tokens.get("expires_in"),
+    }
 
 
 @app.post("/postmark/inbound")

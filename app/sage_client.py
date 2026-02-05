@@ -48,6 +48,29 @@ def check_sage_auth() -> Dict[str, Any]:
     return {"status": "ok", "access_token": access_token[:10] + "..."}
 
 
+def exchange_auth_code(code: str) -> Dict[str, Any]:
+    client_id = _get_env("SAGE_CLIENT_ID")
+    client_secret = _get_env("SAGE_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        raise RuntimeError("Missing Sage OAuth env vars")
+
+    resp = requests.post(
+        SAGE_TOKEN_URL,
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": "https://oauth.pstmn.io/v1/browser-callback",
+            "client_id": client_id,
+            "client_secret": client_secret,
+        },
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
     if invoice.ledger_account == 5001:
         return _get_env("SAGE_LEDGER_5001_ID")
