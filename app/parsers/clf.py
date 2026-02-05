@@ -9,6 +9,7 @@ from app.parse_utils import approx_equal, first_match, parse_date, parse_money
 
 
 _POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
+_DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})\b")
 
 _LEDGER_MAP = {
     "CF10 1AE": 5001,
@@ -57,12 +58,14 @@ def _extract_invoice_number(text: str) -> str:
 def _extract_invoice_date(text: str) -> Optional[str]:
     patterns = [
         r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
-        r"Posting\s*Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
+        r"Posting\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
     ]
     match = first_match(patterns, text, flags=re.IGNORECASE)
     if match:
-        return match.group(match.lastindex)
+        value = match.group(match.lastindex)
+        date_match = _DATE_RE.search(value)
+        return date_match.group(1) if date_match else value
     return None
 
 
@@ -100,6 +103,14 @@ def _extract_postcode_from_lines(text: str) -> Optional[str]:
     return None
 
 
+def _find_known_postcode(text: str) -> Optional[str]:
+    normalized = re.sub(r"\s+", "", (text or "").upper())
+    for known in _LEDGER_MAP.keys():
+        if known.replace(" ", "") in normalized:
+            return known
+    return None
+
+
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -112,12 +123,9 @@ def parse_clf(text: str) -> InvoiceData:
         if postcode_match:
             postcode = _normalize_postcode(postcode_match.group(0))
     if not postcode:
-        postcode = _extract_postcode_from_lines(text or "")
+        postcode = _find_known_postcode(text or "")
     if not postcode:
-        for known in _LEDGER_MAP.keys():
-            if known.replace(" ", "") in (text or "").upper().replace(" ", ""):
-                postcode = known
-                break
+        postcode = _extract_postcode_from_lines(text or "")
 
     if postcode:
         ledger_account = _LEDGER_MAP.get(postcode)
