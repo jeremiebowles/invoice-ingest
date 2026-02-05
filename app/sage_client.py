@@ -48,6 +48,33 @@ def check_sage_auth() -> Dict[str, Any]:
     return {"status": "ok", "access_token": access_token[:10] + "..."}
 
 
+def debug_refresh() -> Dict[str, Any]:
+    client_id = _get_env("SAGE_CLIENT_ID")
+    client_secret = _get_env("SAGE_CLIENT_SECRET")
+    refresh_token = _get_env("SAGE_REFRESH_TOKEN")
+
+    if not client_id or not client_secret or not refresh_token:
+        return {"status": "error", "message": "Missing Sage OAuth env vars"}
+
+    resp = requests.post(
+        SAGE_TOKEN_URL,
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
+        },
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+    if resp.status_code >= 400:
+        try:
+            body = resp.json()
+        except ValueError:
+            body = {"raw": resp.text[:2000]}
+        return {"status": "error", "http_status": resp.status_code, "body": body}
+    return {"status": "ok"}
+
 def exchange_auth_code(code: str) -> Dict[str, Any]:
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")

@@ -13,6 +13,7 @@ from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
 from app.sage_client import (
     check_sage_auth,
+    debug_refresh,
     exchange_auth_code,
     post_purchase_credit_note,
     post_purchase_invoice,
@@ -161,6 +162,14 @@ async def sage_health() -> Dict[str, Any]:
     if not SAGE_ENABLED:
         return {"status": "disabled"}
     return check_sage_auth()
+
+
+@app.get("/sage/test-refresh")
+async def sage_test_refresh(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    return debug_refresh()
 
 
 @app.post("/sage/post")
