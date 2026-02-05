@@ -32,7 +32,7 @@ BASIC_PASS = os.environ.get("BASIC_PASS", "")
 
 # Reject huge requests before JSON parsing/base64 decode
 # (Postmark payloads with a PDF attached are typically far smaller than this.)
-MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "2000000"))  # 2 MB default
+MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "50000"))  # 2 MB default 2000000
 
 
 @app.get("/")
