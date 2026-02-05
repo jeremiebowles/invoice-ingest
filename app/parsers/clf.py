@@ -298,10 +298,17 @@ def parse_clf(text: str) -> InvoiceData:
             vat_amount = vat_amount_from_breakdown
 
     # Zero-VAT fallback: no S/Z lines detected, but Total GBP exists
-    if vat_net is None and nonvat_net is None and vat_amount is None and total_gbp is not None:
+    zero_vat_fallback = (
+        vat_net is None
+        and nonvat_net is None
+        and vat_amount is None
+        and total_gbp is not None
+    )
+    if zero_vat_fallback:
         vat_net = 0.0
         nonvat_net = total_gbp
         vat_amount = 0.0
+        total_incl_vat = total_gbp
 
     if vat_net is None:
         vat_net = 0.0
