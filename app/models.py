@@ -16,7 +16,6 @@ class InvoiceData(BaseModel):
     due_date: date | None = None
 
     description: str = "Purchases"
-    ledger_bucket: LedgerBucket = "unknown"
 
     ledger_account: int | None = None
     deliver_to_postcode: str | None = None
