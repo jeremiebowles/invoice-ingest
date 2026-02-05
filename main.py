@@ -156,6 +156,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     logger.info("Extracted text head: %s", text[:800])
 
     invoice = parse_clf(text)
+    logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
 
     return {
         "status": "ok",
