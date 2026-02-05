@@ -157,7 +157,7 @@ def _extract_vat_breakdown(
             break
 
     for line in lines[start_idx:]:
-        if re.match(r"^[SZ]\\b", line):
+        if re.match(r"^[SZ]\b", line):
             values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
                 if line.startswith("S"):
@@ -175,11 +175,11 @@ def _extract_total_gbp_incl_vat(text: str) -> Optional[float]:
     for line in lines:
         if re.search(r"VAT\s*Identifier", line, flags=re.IGNORECASE):
             in_vat_section = True
-        if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
+        if re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
             values = _extract_money_values(line)
             if values:
                 return values[0]
-        if in_vat_section and re.match(r"^Total\\b", line, flags=re.IGNORECASE):
+        if in_vat_section and re.match(r"^Total\b", line, flags=re.IGNORECASE):
             values = _extract_money_values(line)
             if values:
                 return values[0]
