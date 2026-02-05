@@ -60,17 +60,9 @@ def _compute_due_date(invoice_date: date) -> date:
     return invoice_date + timedelta(days=30)
 
 
-def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
-    business_id = _get_env("SAGE_BUSINESS_ID")
-    contact_id = _get_env("SAGE_CONTACT_ID")
-    if not business_id or not contact_id:
-        raise RuntimeError("Missing Sage business/contact configuration")
-
-    ledger_account_id = _get_ledger_account_id(invoice)
-    if not ledger_account_id:
-        raise RuntimeError("Missing Sage ledger account mapping")
-
-    access_token = _refresh_access_token()
+def _build_invoice_lines(
+    invoice: InvoiceData, ledger_account_id: str
+) -> tuple[list[Dict[str, Any]], float, float, float]:
     tax_standard_id, tax_zero_id = _get_tax_rate_ids()
 
     vat_net = round(invoice.vat_net, 2)
@@ -78,9 +70,8 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     vat_amount = round(invoice.vat_amount, 2)
     net_amount = round(vat_net + nonvat_net, 2)
     total_amount = round(net_amount + vat_amount, 2)
-    due_date = _compute_due_date(invoice.invoice_date)
 
-    invoice_lines = []
+    invoice_lines: list[Dict[str, Any]] = []
     if vat_net > 0:
         invoice_lines.append(
             {
@@ -112,6 +103,34 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     if not invoice_lines:
         raise RuntimeError("Invoice has no line amounts to post")
 
+    return invoice_lines, net_amount, vat_amount, total_amount
+
+
+def _sage_headers(access_token: str, business_id: str) -> Dict[str, str]:
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Session-Company-Id": business_id,
+    }
+
+
+def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    contact_id = _get_env("SAGE_CONTACT_ID")
+    if not business_id or not contact_id:
+        raise RuntimeError("Missing Sage business/contact configuration")
+
+    ledger_account_id = _get_ledger_account_id(invoice)
+    if not ledger_account_id:
+        raise RuntimeError("Missing Sage ledger account mapping")
+
+    access_token = _refresh_access_token()
+    invoice_lines, net_amount, vat_amount, total_amount = _build_invoice_lines(
+        invoice, ledger_account_id
+    )
+    due_date = _compute_due_date(invoice.invoice_date)
+
     payload = {
         "purchase_invoice": {
             "contact_id": contact_id,
@@ -128,12 +147,47 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
 
     resp = requests.post(
         f"{SAGE_API_BASE}/purchase_invoices",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "X-Session-Company-Id": business_id,
-        },
+        headers=_sage_headers(access_token, business_id),
+        json=payload,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    contact_id = _get_env("SAGE_CONTACT_ID")
+    if not business_id or not contact_id:
+        raise RuntimeError("Missing Sage business/contact configuration")
+
+    ledger_account_id = _get_ledger_account_id(invoice)
+    if not ledger_account_id:
+        raise RuntimeError("Missing Sage ledger account mapping")
+
+    access_token = _refresh_access_token()
+    invoice_lines, net_amount, vat_amount, total_amount = _build_invoice_lines(
+        invoice, ledger_account_id
+    )
+    due_date = _compute_due_date(invoice.invoice_date)
+
+    payload = {
+        "purchase_credit_note": {
+            "contact_id": contact_id,
+            "date": invoice.invoice_date.isoformat(),
+            "due_date": due_date.isoformat(),
+            "reference": invoice.supplier_reference,
+            "credit_note_number": invoice.supplier_reference,
+            "net_amount": net_amount,
+            "tax_amount": vat_amount,
+            "total_amount": total_amount,
+            "invoice_lines": invoice_lines,
+        }
+    }
+
+    resp = requests.post(
+        f"{SAGE_API_BASE}/purchase_credit_notes",
+        headers=_sage_headers(access_token, business_id),
         json=payload,
         timeout=30,
     )

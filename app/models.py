@@ -12,6 +12,7 @@ class InvoiceData(BaseModel):
     invoice_date: date
     due_date: Optional[date] = None
     description: str = "Purchases"
+    is_credit: bool = False
     deliver_to_postcode: Optional[str] = None
     ledger_account: Optional[int] = None
     vat_net: float = Field(ge=0)

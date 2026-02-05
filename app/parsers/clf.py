@@ -55,19 +55,29 @@ def _extract_invoice_number(text: str) -> str:
         return match.group(match.lastindex)
     return "UNKNOWN"
 
+def _extract_credit_number(text: str) -> Optional[str]:
+    patterns = [
+        r"Credit\s*Memo\s*(Number|No\.?|#)\s*[:]?\s*([A-Z0-9\-/]+)",
+        r"Credit\s*Note\s*(Number|No\.?|#)\s*[:]?\s*([A-Z0-9\-/]+)",
+    ]
+    match = first_match(patterns, text, flags=re.IGNORECASE)
+    if match:
+        return match.group(match.lastindex)
+    return None
+
 
 def _extract_invoice_date(text: str) -> Optional[str]:
     match = re.search(
-        r"Posting\s*Date\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        r"(Posting\s*Date|Posting/Tax\s*Point\s*Date)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
         text or "",
         flags=re.IGNORECASE,
     )
     if match:
-        return match.group(1)
+        return match.group(match.lastindex)
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     for line in lines:
-        if re.search(r"Posting\s*Date", line, flags=re.IGNORECASE):
+        if re.search(r"Posting\s*Date|Posting/Tax\s*Point\s*Date", line, flags=re.IGNORECASE):
             date_match = _DATE_RE.search(line)
             if date_match:
                 return date_match.group(1)
@@ -75,6 +85,7 @@ def _extract_invoice_date(text: str) -> Optional[str]:
     patterns = [
         r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Posting\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
+        r"Posting/Tax\s*Point\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
     ]
     match = first_match(patterns, text, flags=re.IGNORECASE)
@@ -237,6 +248,7 @@ def _extract_total_gbp(text: str) -> Optional[float]:
 
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
+    is_credit = bool(re.search(r"Credit\s*(Memo|Note)", text or "", flags=re.IGNORECASE))
 
     deliver_block = _extract_deliver_to_block(text or "")
     postcode = None
@@ -258,7 +270,8 @@ def parse_clf(text: str) -> InvoiceData:
     else:
         warnings.append("Deliver To postcode not found")
 
-    invoice_number = _extract_invoice_number(text or "")
+    credit_number = _extract_credit_number(text or "")
+    invoice_number = credit_number or _extract_invoice_number(text or "")
     invoice_date_str = _extract_invoice_date(text or "")
     invoice_date = parse_date(invoice_date_str)
     if not invoice_date:
@@ -335,11 +348,18 @@ def parse_clf(text: str) -> InvoiceData:
     if totals_vat_amount is not None and not approx_equal(vat_amount, totals_vat_amount):
         warnings.append("VAT Amount does not reconcile")
 
+    if is_credit:
+        vat_net = abs(vat_net)
+        nonvat_net = abs(nonvat_net)
+        vat_amount = abs(vat_amount)
+        total = abs(total)
+
     return InvoiceData(
         supplier="CLF",
         supplier_reference=invoice_number,
         invoice_date=invoice_date,
         due_date=due_date,
+        is_credit=is_credit,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
         vat_net=max(vat_net, 0.0),

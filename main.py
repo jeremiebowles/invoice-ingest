@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 
 from app.parsers.clf import parse_clf
 from app.pdf_text import extract_text_from_pdf
-from app.sage_client import post_purchase_invoice
+from app.sage_client import post_purchase_credit_note, post_purchase_invoice
 
 
 logging.basicConfig(level=logging.INFO)
@@ -171,7 +171,10 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     sage_result = None
     if SAGE_ENABLED:
         try:
-            sage_result = post_purchase_invoice(invoice)
+            if invoice.is_credit:
+                sage_result = post_purchase_credit_note(invoice)
+            else:
+                sage_result = post_purchase_invoice(invoice)
         except Exception as exc:
             logger.exception("Sage post failed: %s", exc)
             sage_result = {"status": "error", "message": str(exc)}
