@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import json
 import logging
 import os
 import sys
@@ -29,10 +30,7 @@ logger = _setup_logging()
 # ---- Config ----
 BASIC_USER = os.environ.get("BASIC_USER", "")
 BASIC_PASS = os.environ.get("BASIC_PASS", "")
-
-# Reject huge requests before JSON parsing/base64 decode
-# (Postmark payloads with a PDF attached are typically far smaller than this.)
-MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "50000"))  # 2 MB default 2000000
+MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "2000000"))  # default 2MB
 
 
 @app.get("/")
@@ -51,45 +49,62 @@ def _basic_auth_ok(req: Request) -> bool:
     return decoded == f"{BASIC_USER}:{BASIC_PASS}"
 
 
+async def _read_body_with_limit(req: Request, limit: int) -> bytes:
+    """
+    Enforce a hard limit even if Content-Length is missing (chunked transfer).
+    """
+    cl = req.headers.get("content-length")
+    if cl:
+        try:
+            n = int(cl)
+        except ValueError:
+            raise HTTPException(400, "Invalid Content-Length")
+        if n > limit:
+            logger.warning("Inbound: reject Content-Length=%s limit=%s", n, limit)
+            raise HTTPException(413, "Request too large")
+
+        body = await req.body()
+        if len(body) > limit:
+            logger.warning("Inbound: reject after read bytes=%s limit=%s", len(body), limit)
+            raise HTTPException(413, "Request too large")
+        return body
+
+    buf = bytearray()
+    async for chunk in req.stream():
+        buf.extend(chunk)
+        if len(buf) > limit:
+            logger.warning("Inbound: reject streaming bytes=%s limit=%s", len(buf), limit)
+            raise HTTPException(413, "Request too large")
+    return bytes(buf)
+
+
 @app.post("/postmark/inbound")
 async def postmark_inbound(req: Request):
-    # 1) Auth first (cheap)
     if not _basic_auth_ok(req):
         raise HTTPException(401, "Unauthorized")
 
-    # 2) Size guard before reading/parsing the body (cheaper than json/base64)
-    content_length = req.headers.get("content-length")
-    if content_length:
-        try:
-            n = int(content_length)
-        except ValueError:
-            raise HTTPException(400, "Invalid Content-Length")
-        if n > MAX_REQUEST_BYTES:
-            logger.warning("Inbound: rejected oversized request bytes=%s limit=%s", n, MAX_REQUEST_BYTES)
-            raise HTTPException(413, "Request too large")
+    # Size guard BEFORE JSON/base64 work
+    body_bytes = await _read_body_with_limit(req, MAX_REQUEST_BYTES)
 
-    # 3) Now it's safe to parse JSON
-    payload = await req.json()
+    try:
+        payload = json.loads(body_bytes.decode("utf-8") if body_bytes else "{}")
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
 
     attachments = payload.get("Attachments", []) or []
-    logger.info("Inbound: attachments=%s", len(attachments))
+    logger.info("Inbound: attachments=%s max_request_bytes=%s", len(attachments), MAX_REQUEST_BYTES)
 
-    from_email = (payload.get("FromFull") or {}).get("Email") or payload.get("From")
-    subject = payload.get("Subject")
-    to_email = payload.get("To")
-    logger.info("Inbound: from=%s to=%s subject=%s", from_email, to_email, subject)
-
-    # Pick first PDF attachment
     pdfs = [
         a for a in attachments
         if a.get("ContentType") == "application/pdf"
         or a.get("Name", "").lower().endswith(".pdf")
     ]
     if not pdfs:
-        names = [a.get("Name") for a in attachments]
-        ctypes = [a.get("ContentType") for a in attachments]
-        logger.info("Inbound: no PDF found. names=%s content_types=%s", names, ctypes)
-        return {"status": "no_pdf", "attachment_names": names}
+        return {
+            "status": "no_pdf",
+            "attachment_names": [a.get("Name") for a in attachments],
+            "max_request_bytes": MAX_REQUEST_BYTES,
+        }
 
     pdf = pdfs[0]
     pdf_name = pdf.get("Name") or "invoice.pdf"
