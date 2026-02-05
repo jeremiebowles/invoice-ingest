@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 
 from app.parsers.clf import parse_clf
 from app.pdf_text import extract_text_from_pdf
+from app.sage_client import post_purchase_invoice
 
 
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,7 @@ BASIC_USER = os.getenv("BASIC_USER")
 BASIC_PASS = os.getenv("BASIC_PASS")
 MAX_REQUEST_BYTES = os.getenv("MAX_REQUEST_BYTES")
 LOG_PDF_TEXT = os.getenv("LOG_PDF_TEXT", "").lower() in {"1", "true", "yes", "on"}
+SAGE_ENABLED = os.getenv("SAGE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -166,8 +168,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
 
+    sage_result = None
+    if SAGE_ENABLED:
+        try:
+            sage_result = post_purchase_invoice(invoice)
+        except Exception as exc:
+            logger.exception("Sage post failed: %s", exc)
+            sage_result = {"status": "error", "message": str(exc)}
+
     return {
         "status": "ok",
         "max_request_bytes": _max_request_bytes(),
         "parsed": _invoice_to_dict(invoice),
+        "sage": sage_result,
     }
