@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import re
+from datetime import timedelta
+from typing import Optional
+
+from app.models import InvoiceData
+from app.parse_utils import approx_equal, first_match, parse_date, parse_money
+
+
+_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
+
+_LEDGER_MAP = {
+    "CF10 1AE": 5001,
+    "CF24 3LP": 5002,
+    "CF11 9DX": 5004,
+}
+
+
+def _normalize_postcode(raw: str) -> str:
+    raw = raw.strip().upper().replace(" ", "")
+    if len(raw) <= 3:
+        return raw
+    return f"{raw[:-3]} {raw[-3:]}"
+
+
+def _extract_deliver_to_block(text: str) -> Optional[str]:
+    match = re.search(
+        r"Deliver\s*To\s*:?.*?\n(.+?)(?:\n\s*\n|Bill\s*To|Invoice|Purchase|Order|VAT|Total|Amount|$)",
+        text,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def _extract_amount(text: str, labels: list[str]) -> Optional[float]:
+    patterns = [rf"{label}\s*[:£$]?\s*([\d,]+\.\d{{2}})" for label in labels]
+    match = first_match(patterns, text, flags=re.IGNORECASE)
+    if match:
+        return parse_money(match.group(1))
+    return None
+
+
+def _extract_invoice_number(text: str) -> str:
+    patterns = [
+        r"Invoice\s*(Number|No\.?|#)\s*[:]?\s*([A-Z0-9\-/]+)",
+        r"Inv\s*No\.?\s*[:]?\s*([A-Z0-9\-/]+)",
+    ]
+    match = first_match(patterns, text, flags=re.IGNORECASE)
+    if match:
+        return match.group(match.lastindex)
+    return "UNKNOWN"
+
+
+def _extract_invoice_date(text: str) -> Optional[str]:
+    patterns = [
+        r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
+        r"Date\s*[:]?\s*([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})",
+    ]
+    match = first_match(patterns, text, flags=re.IGNORECASE)
+    if match:
+        return match.group(match.lastindex)
+    return None
+
+
+def _extract_due_date(text: str) -> Optional[str]:
+    patterns = [
+        r"Due\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
+        r"Payment\s*Due\s*[:]?\s*([A-Z0-9\-/ ]+)",
+    ]
+    match = first_match(patterns, text, flags=re.IGNORECASE)
+    if match:
+        return match.group(match.lastindex)
+    return None
+
+
+def _extract_terms_days(text: str) -> Optional[int]:
+    match = re.search(r"Net\s*(\d{1,3})", text, flags=re.IGNORECASE)
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def parse_clf(text: str) -> InvoiceData:
+    warnings: list[str] = []
+
+    deliver_block = _extract_deliver_to_block(text or "")
+    postcode = None
+    ledger_account = None
+
+    if not deliver_block:
+        warnings.append("Deliver To block not found")
+    else:
+        postcode_match = _POSTCODE_RE.search(deliver_block)
+        if postcode_match:
+            postcode = _normalize_postcode(postcode_match.group(0))
+            ledger_account = _LEDGER_MAP.get(postcode)
+            if ledger_account is None:
+                warnings.append(f"Unknown Deliver To postcode: {postcode}")
+        else:
+            warnings.append("Deliver To postcode not found")
+
+    invoice_number = _extract_invoice_number(text or "")
+    invoice_date_str = _extract_invoice_date(text or "")
+    invoice_date = parse_date(invoice_date_str)
+    if not invoice_date:
+        warnings.append("Invoice date not found")
+        invoice_date = parse_date("01/01/1970")
+
+    due_date_str = _extract_due_date(text or "")
+    due_date = parse_date(due_date_str) if due_date_str else None
+    if due_date is None:
+        terms_days = _extract_terms_days(text or "")
+        if terms_days and invoice_date:
+            due_date = invoice_date + timedelta(days=terms_days)
+
+    vat_net = _extract_amount(text, ["VAT Net", "VATable", "Net"])
+    nonvat_net = _extract_amount(text, ["Non-VAT", "Non VAT", "Zero Rated", "Non-Vatable"])
+    vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
+    total = _extract_amount(text, ["Total", "Amount Due", "Balance Due"])
+
+    if vat_net is None:
+        vat_net = 0.0
+        warnings.append("VAT net amount not found")
+    if nonvat_net is None:
+        nonvat_net = 0.0
+        warnings.append("Non-VAT net amount not found")
+    if vat_amount is None:
+        vat_amount = 0.0
+        warnings.append("VAT amount not found")
+    if total is None:
+        total = vat_net + nonvat_net + vat_amount
+        warnings.append("Total amount not found")
+
+    subtotal = vat_net + nonvat_net + vat_amount
+    if not approx_equal(subtotal, total):
+        warnings.append("Totals do not reconcile")
+
+    return InvoiceData(
+        supplier="CLF",
+        supplier_reference=invoice_number,
+        invoice_date=invoice_date,
+        due_date=due_date,
+        deliver_to_postcode=postcode,
+        ledger_account=ledger_account,
+        vat_net=max(vat_net, 0.0),
+        nonvat_net=max(nonvat_net, 0.0),
+        vat_amount=max(vat_amount, 0.0),
+        total=max(total, 0.0),
+        warnings=warnings,
+    )
