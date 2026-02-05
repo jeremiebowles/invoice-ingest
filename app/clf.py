@@ -165,12 +165,15 @@ def parse_clf(text: str) -> InvoiceData:
         supplier_reference=inv_no,
         invoice_date=invoice_date,
         due_date=due_date,
+        deliver_to_postcode=deliver_to_postcode,
+        ledger_account=ledger_account,
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,
         total=total,
         warnings=warnings,
     )
+
 
     # If you haven't added a field yet, you can at least log these now:
     # logger.info("DeliverTo postcode=%s ledger_account=%s", deliver_to_postcode, ledger_account)
