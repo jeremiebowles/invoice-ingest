@@ -152,28 +152,34 @@ def _extract_vat_breakdown(
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     start_idx = 0
     for idx, line in enumerate(lines):
-        if re.search(r"VAT\\s*Identifier", line, flags=re.IGNORECASE):
+        if re.search(r"VAT\s*Identifier", line, flags=re.IGNORECASE):
             start_idx = idx + 1
             break
 
     for line in lines[start_idx:]:
-        if re.match(r"^S\\b", line):
+        if re.match(r"^[SZ]\\b", line):
             values = _strip_vat_rate(_extract_money_values(line))
             if len(values) >= 2:
-                vat_net = values[0]
-                vat_amount = values[-1] if len(values) >= 2 else vat_amount
-        if re.match(r"^Z\\b", line):
-            values = _strip_vat_rate(_extract_money_values(line))
-            if len(values) >= 2:
-                nonvat_net = values[0]
+                if line.startswith("S"):
+                    vat_net = values[0]
+                    vat_amount = values[-1] if len(values) >= 2 else vat_amount
+                elif line.startswith("Z"):
+                    nonvat_net = values[0]
 
     return vat_net, nonvat_net, vat_amount
 
 
 def _extract_total_gbp_incl_vat(text: str) -> Optional[float]:
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    in_vat_section = False
     for line in lines:
+        if re.search(r"VAT\s*Identifier", line, flags=re.IGNORECASE):
+            in_vat_section = True
         if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                return values[0]
+        if in_vat_section and re.match(r"^Total\\b", line, flags=re.IGNORECASE):
             values = _extract_money_values(line)
             if values:
                 return values[0]
