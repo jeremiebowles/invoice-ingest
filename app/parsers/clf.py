@@ -9,7 +9,7 @@ from app.parse_utils import approx_equal, first_match, parse_date, parse_money
 
 
 _POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
-_DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/][0-9]{1,2}[\-/][0-9]{2,4})\b")
+_DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/.][0-9]{1,2}[\-/.][0-9]{2,4})\b")
 _MONEY_CAPTURE_RE = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[-+]?\d+(?:\.\d{2})")
 
 _LEDGER_MAP = {
@@ -68,7 +68,7 @@ def _extract_credit_number(text: str) -> Optional[str]:
 
 def _extract_invoice_date(text: str) -> Optional[str]:
     match = re.search(
-        r"(Posting\s*Date|Posting/Tax\s*Point\s*Date|Posting\s*Tax\s*Point\s*Dat)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        r"(Posting\s*Date|Posting/Tax\s*Point\s*Date|Posting\s*Tax\s*Point\s*Dat)\s*:?\s*([0-9]{1,2}[\-/.][0-9]{1,2}[\-/.][0-9]{2,4})",
         text or "",
         flags=re.IGNORECASE,
     )
@@ -94,6 +94,9 @@ def _extract_invoice_date(text: str) -> Optional[str]:
         value = match.group(match.lastindex)
         date_match = _DATE_RE.search(value)
         return date_match.group(1) if date_match else value
+    match = re.search(r"\b\d{1,2}\.\s*[A-Za-z]+\s+\d{4}\b", text or "")
+    if match:
+        return match.group(0)
     return None
 
 
