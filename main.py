@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import FastAPI, HTTPException, Request, status
 
 from app.parsers.clf import parse_clf
 from app.pdf_text import extract_text_from_pdf
@@ -100,6 +100,23 @@ def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
     return dict(invoice)
 
 
+def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    attachments = payload.get("Attachments") or []
+    if not isinstance(attachments, list):
+        return None
+
+    for attachment in attachments:
+        if not isinstance(attachment, dict):
+            continue
+        content_type = (attachment.get("ContentType") or "").lower()
+        name = (attachment.get("Name") or "").lower()
+        if "pdf" in content_type or name.endswith(".pdf"):
+            if attachment.get("Content"):
+                return attachment
+
+    return None
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -115,15 +132,10 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
 
-    attachments = payload.get("Attachments") or []
-    pdf_attachment = None
-    for attachment in attachments:
-        content_type = (attachment.get("ContentType") or "").lower()
-        name = (attachment.get("Name") or "").lower()
-        if "pdf" in content_type or name.endswith(".pdf"):
-            pdf_attachment = attachment
-            break
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
 
+    pdf_attachment = _find_first_pdf_attachment(payload)
     if not pdf_attachment:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No PDF attachment found")
 
