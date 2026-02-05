@@ -137,7 +137,11 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     pdf_attachment = _find_first_pdf_attachment(payload)
     if not pdf_attachment:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No PDF attachment found")
+        return {
+            "status": "ok",
+            "max_request_bytes": _max_request_bytes(),
+            "message": "No PDF attachment found",
+        }
 
     content = pdf_attachment.get("Content")
     if not content:
