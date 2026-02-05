@@ -212,6 +212,19 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
     return total_excl, vat_amount, total_incl
 
 
+def _extract_vat_section_total(text: str) -> Optional[float]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    in_vat_section = False
+    for line in lines:
+        if re.search(r"VAT\s*Identifier", line, flags=re.IGNORECASE):
+            in_vat_section = True
+        if in_vat_section and re.match(r"^Total\b", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                return values[0]
+    return None
+
+
 def parse_clf(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -254,6 +267,9 @@ def parse_clf(text: str) -> InvoiceData:
     vat_amount = _extract_amount(text, ["VAT Amount", "VAT"])
     total_excl_vat, totals_vat_amount, total_incl_vat = _extract_totals_block(text)
     total_incl_vat = total_incl_vat or _extract_total_gbp_incl_vat(text)
+    vat_section_total = _extract_vat_section_total(text)
+    if total_incl_vat is None and vat_section_total is not None:
+        total_incl_vat = vat_section_total
     if vat_amount is None and totals_vat_amount is not None:
         vat_amount = totals_vat_amount
 
