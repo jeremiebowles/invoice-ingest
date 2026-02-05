@@ -1,127 +1,207 @@
+# main.py
+from __future__ import annotations
+
 import base64
-import hashlib
-import json
+import binascii
 import logging
 import os
-import sys
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+
+from app.pdf_text import extract_text_from_pdf
+from app.parsers.clf import parse_clf
+
+logger = logging.getLogger("invoice_ingest")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI()
 
-# ---- Logging that shows up on Cloud Run ----
-def _setup_logging() -> logging.Logger:
-    logger = logging.getLogger("invoice_ingest")
-    logger.setLevel(logging.INFO)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
-
-    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
-        logger.addHandler(handler)
-
-    logger.propagate = False
-    return logger
-
-
-logger = _setup_logging()
-
-# ---- Config ----
-BASIC_USER = os.environ.get("BASIC_USER", "")
-BASIC_PASS = os.environ.get("BASIC_PASS", "")
-MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", "2000000"))  # default 2MB
-
-
-@app.get("/")
-def health():
-    return {"ok": True, "service": "invoice-ingest"}
-
-
-def _basic_auth_ok(req: Request) -> bool:
-    auth = req.headers.get("authorization", "")
-    if not (BASIC_USER and BASIC_PASS and auth.startswith("Basic ")):
-        return False
+def _get_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
     try:
-        decoded = base64.b64decode(auth.split(" ", 1)[1]).decode("utf-8")
+        v = int(raw)
+        return v if v > 0 else default
+    except ValueError:
+        logger.warning("Invalid int env %s=%r; using default=%d", name, raw, default)
+        return default
+
+
+MAX_REQUEST_BYTES = _get_int_env("MAX_REQUEST_BYTES", 2_000_000)
+MAX_PDF_BYTES = _get_int_env("MAX_PDF_BYTES", 2_500_000)  # harmless even if your PDFs are tiny
+
+BASIC_USER = os.getenv("BASIC_USER")
+BASIC_PASS = os.getenv("BASIC_PASS")
+
+
+def _unauthorized() -> HTTPException:
+    return HTTPException(
+        status_code=401,
+        detail="Unauthorized",
+        headers={"WWW-Authenticate": 'Basic realm="invoice-ingest"'},
+    )
+
+
+def _check_basic_auth(request: Request) -> None:
+    if not BASIC_USER or not BASIC_PASS:
+        # Security footgun prevention: if you forgot to set env vars, reject.
+        raise HTTPException(status_code=500, detail="Auth not configured (BASIC_USER/BASIC_PASS missing)")
+
+    auth = request.headers.get("authorization") or ""
+    if not auth.lower().startswith("basic "):
+        raise _unauthorized()
+
+    b64 = auth.split(" ", 1)[1].strip()
+    try:
+        decoded = base64.b64decode(b64).decode("utf-8", errors="strict")
     except Exception:
-        return False
-    return decoded == f"{BASIC_USER}:{BASIC_PASS}"
+        raise _unauthorized()
+
+    if ":" not in decoded:
+        raise _unauthorized()
+
+    user, pw = decoded.split(":", 1)
+    if user != BASIC_USER or pw != BASIC_PASS:
+        raise _unauthorized()
 
 
-async def _read_body_with_limit(req: Request, limit: int) -> bytes:
-    """
-    Enforce a hard limit even if Content-Length is missing (chunked transfer).
-    """
-    cl = req.headers.get("content-length")
-    if cl:
-        try:
-            n = int(cl)
-        except ValueError:
-            raise HTTPException(400, "Invalid Content-Length")
-        if n > limit:
-            logger.warning("Inbound: reject Content-Length=%s limit=%s", n, limit)
-            raise HTTPException(413, "Request too large")
+def _find_first_pdf_attachment(payload: dict[str, Any]) -> dict[str, Any] | None:
+    attachments = payload.get("Attachments") or []
+    if not isinstance(attachments, list):
+        return None
 
-        body = await req.body()
-        if len(body) > limit:
-            logger.warning("Inbound: reject after read bytes=%s limit=%s", len(body), limit)
-            raise HTTPException(413, "Request too large")
-        return body
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        name = (att.get("Name") or "").strip()
+        ctype = (att.get("ContentType") or "").strip().lower()
+        content = att.get("Content")
 
-    buf = bytearray()
-    async for chunk in req.stream():
-        buf.extend(chunk)
-        if len(buf) > limit:
-            logger.warning("Inbound: reject streaming bytes=%s limit=%s", len(buf), limit)
-            raise HTTPException(413, "Request too large")
-    return bytes(buf)
+        looks_like_pdf = (
+            "pdf" in ctype
+            or name.lower().endswith(".pdf")
+        )
+
+        if looks_like_pdf and isinstance(content, str) and content.strip():
+            return att
+
+    return None
+
+
+def _invoice_to_dict(invoice: Any) -> dict[str, Any]:
+    # Pydantic v2 uses model_dump(), v1 uses dict()
+    if hasattr(invoice, "model_dump"):
+        return invoice.model_dump()
+    if hasattr(invoice, "dict"):
+        return invoice.dict()
+    return dict(invoice)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.post("/postmark/inbound")
-async def postmark_inbound(req: Request):
-    if not _basic_auth_ok(req):
-        raise HTTPException(401, "Unauthorized")
+async def postmark_inbound(request: Request) -> JSONResponse:
+    # 1) Auth
+    _check_basic_auth(request)
 
-    # Size guard BEFORE JSON/base64 work
-    body_bytes = await _read_body_with_limit(req, MAX_REQUEST_BYTES)
+    # 2) Size guard BEFORE reading body
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            cl = int(content_length)
+            if cl > MAX_REQUEST_BYTES:
+                logger.info("Inbound: reject Content-Length=%d limit=%d", cl, MAX_REQUEST_BYTES)
+                raise HTTPException(status_code=413, detail="Request too large")
+        except ValueError:
+            # If it's malformed, ignore and let JSON parsing fail naturally.
+            pass
 
+    # 3) Parse JSON
     try:
-        payload = json.loads(body_bytes.decode("utf-8") if body_bytes else "{}")
+        payload = await request.json()
     except Exception:
-        raise HTTPException(400, "Invalid JSON")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    attachments = payload.get("Attachments", []) or []
-    logger.info("Inbound: attachments=%s max_request_bytes=%s", len(attachments), MAX_REQUEST_BYTES)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="JSON payload must be an object")
 
-    pdfs = [
-        a for a in attachments
-        if a.get("ContentType") == "application/pdf"
-        or a.get("Name", "").lower().endswith(".pdf")
-    ]
-    if not pdfs:
-        return {
-            "status": "no_pdf",
-            "attachment_names": [a.get("Name") for a in attachments],
+    attachments = payload.get("Attachments") or []
+    att_count = len(attachments) if isinstance(attachments, list) else 0
+    logger.info("Inbound: attachments=%d max_request_bytes=%d", att_count, MAX_REQUEST_BYTES)
+
+    # 4) Find first PDF attachment
+    att = _find_first_pdf_attachment(payload)
+    if not att:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "ok",
+                "message": "No PDF attachment found",
+                "attachments": att_count,
+                "max_request_bytes": MAX_REQUEST_BYTES,
+            },
+        )
+
+    pdf_name = (att.get("Name") or "attachment.pdf").strip()
+    pdf_b64 = att.get("Content") or ""
+    pdf_ctype = (att.get("ContentType") or "").strip()
+
+    # 5) Decode base64 PDF
+    try:
+        pdf_bytes = base64.b64decode(pdf_b64, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="Attachment base64 decode failed")
+
+    pdf_len = len(pdf_bytes)
+    logger.info("Inbound: pdf=%r content_type=%r bytes=%d", pdf_name, pdf_ctype, pdf_len)
+
+    if pdf_len > MAX_PDF_BYTES:
+        # You said you're usually ~250KB, so this should never trip,
+        # but it prevents a future “whoops that was a 40MB scan” incident.
+        raise HTTPException(status_code=413, detail=f"PDF too large ({pdf_len} bytes)")
+
+    # 6) Extract text
+    try:
+        text = extract_text_from_pdf(pdf_bytes)
+    except Exception as e:
+        logger.exception("PDF text extraction failed: %s", e)
+        raise HTTPException(status_code=422, detail="PDF text extraction failed")
+
+    # Temporary debugging aid while you tune parsing (remove later)
+    logger.info("PDF text head: %r", text[:800])
+
+    # 7) Parse invoice (CLF)
+    try:
+        invoice = parse_clf(text)
+    except Exception as e:
+        logger.exception("Invoice parsing failed: %s", e)
+        raise HTTPException(status_code=422, detail=f"Invoice parsing failed: {e}")
+
+    parsed = _invoice_to_dict(invoice)
+    logger.info(
+        "Parsed invoice: supplier_ref=%r invoice_date=%r postcode=%r ledger=%r total=%r warnings=%d",
+        parsed.get("supplier_reference"),
+        parsed.get("invoice_date"),
+        parsed.get("deliver_to_postcode"),
+        parsed.get("ledger_account"),
+        parsed.get("total"),
+        len(parsed.get("warnings") or []),
+    )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
             "max_request_bytes": MAX_REQUEST_BYTES,
-        }
-
-    pdf = pdfs[0]
-    pdf_name = pdf.get("Name") or "invoice.pdf"
-
-    try:
-        pdf_bytes = base64.b64decode(pdf["Content"])
-    except Exception:
-        logger.exception("Inbound: failed to decode PDF content")
-        raise HTTPException(400, "Bad PDF attachment encoding")
-
-    pdf_sha256 = hashlib.sha256(pdf_bytes).hexdigest()
-    logger.info("Inbound: pdf=%s size=%s sha256=%s", pdf_name, len(pdf_bytes), pdf_sha256)
-
-    return {
-        "status": "ok",
-        "pdf_name": pdf_name,
-        "pdf_size": len(pdf_bytes),
-        "pdf_sha256": pdf_sha256,
-        "max_request_bytes": MAX_REQUEST_BYTES,
-    }
+            "attachments": att_count,
+            "pdf": {"name": pdf_name, "content_type": pdf_ctype, "bytes": pdf_len},
+            "parsed": parsed,
+        },
+    )
