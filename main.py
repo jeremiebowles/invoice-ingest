@@ -20,6 +20,7 @@ app = FastAPI()
 BASIC_USER = os.getenv("BASIC_USER")
 BASIC_PASS = os.getenv("BASIC_PASS")
 MAX_REQUEST_BYTES = os.getenv("MAX_REQUEST_BYTES")
+LOG_PDF_TEXT = os.getenv("LOG_PDF_TEXT", "").lower() in {"1", "true", "yes", "on"}
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -100,6 +101,13 @@ def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
     return dict(invoice)
 
 
+def _log_pdf_text(text: str) -> None:
+    if not LOG_PDF_TEXT:
+        return
+    logger.info("Extracted text head: %s", text[:800])
+    logger.info("Extracted text tail: %s", text[-1200:])
+
+
 def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     attachments = payload.get("Attachments") or []
     if not isinstance(attachments, list):
@@ -153,8 +161,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
 
     text = extract_text_from_pdf(pdf_bytes)
-    logger.info("Extracted text head: %s", text[:800])
-    logger.info("Extracted text tail: %s", text[-1200:])
+    _log_pdf_text(text)
 
     invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
