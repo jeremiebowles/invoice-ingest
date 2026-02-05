@@ -228,7 +228,7 @@ def _extract_vat_section_total(text: str) -> Optional[float]:
 def _extract_total_gbp(text: str) -> Optional[float]:
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     for line in lines:
-        if re.search(r"Total\\s*GBP\\b", line, flags=re.IGNORECASE):
+        if re.search(r"Total\s*GBP\b", line, flags=re.IGNORECASE):
             values = _extract_money_values(line)
             if values:
                 return values[0]
