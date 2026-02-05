@@ -56,6 +56,13 @@ def _extract_invoice_number(text: str) -> str:
 
 
 def _extract_invoice_date(text: str) -> Optional[str]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    for line in lines:
+        if re.search(r"Posting\\s*Date", line, flags=re.IGNORECASE):
+            date_match = _DATE_RE.search(line)
+            if date_match:
+                return date_match.group(1)
+
     patterns = [
         r"Invoice\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
         r"Posting\s*Date\s*[:]?\s*([A-Z0-9\-/ ]+)",
