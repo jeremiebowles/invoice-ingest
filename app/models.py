@@ -18,6 +18,9 @@ class InvoiceData(BaseModel):
     description: str = "Purchases"
     ledger_bucket: LedgerBucket = "unknown"
 
+    ledger_account: int | None = None
+    deliver_to_postcode: str | None = None
+
     vat_net: float = Field(ge=0)
     nonvat_net: float = Field(ge=0)
     vat_amount: float = Field(ge=0)
