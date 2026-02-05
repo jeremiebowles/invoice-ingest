@@ -136,10 +136,13 @@ def _extract_money_values(line: str) -> list[float]:
     return values
 
 
-def _extract_vat_breakdown(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
+def _extract_vat_breakdown(
+    text: str,
+) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
     vat_net = None
     nonvat_net = None
     vat_amount = None
+    total = None
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     start_idx = 0
@@ -150,19 +153,28 @@ def _extract_vat_breakdown(text: str) -> tuple[Optional[float], Optional[float],
 
     for line in lines[start_idx:]:
         if re.search(r"Total\\s*GBP\\s*Incl\\.?\\s*VAT", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                total = values[0]
             break
-        if re.search(r"\\bS\\b", line):
-            values = _extract_money_values(line)
-            if values:
-                vat_net = values[0]
-                if len(values) > 1:
-                    vat_amount = values[-1]
-        if re.search(r"\\bZ\\b", line):
-            values = _extract_money_values(line)
-            if values:
-                nonvat_net = values[0]
 
-    return vat_net, nonvat_net, vat_amount
+        if re.match(r"^Total\\b", line, flags=re.IGNORECASE):
+            values = _extract_money_values(line)
+            if values:
+                total = values[0]
+            break
+
+        if re.match(r"^S\\b", line):
+            values = _extract_money_values(line)
+            if len(values) >= 2:
+                vat_net = values[1]
+                vat_amount = values[-1] if len(values) >= 3 else vat_amount
+        if re.match(r"^Z\\b", line):
+            values = _extract_money_values(line)
+            if len(values) >= 2:
+                nonvat_net = values[1]
+
+    return vat_net, nonvat_net, vat_amount, total
 
 
 def parse_clf(text: str) -> InvoiceData:
@@ -210,14 +222,21 @@ def parse_clf(text: str) -> InvoiceData:
         ["Total GBP Incl. VAT", "Total Amount", "Total", "Amount Due", "Balance Due", "Invoice Total"],
     )
 
-    if vat_net is None or nonvat_net is None or vat_amount is None:
-        vat_net_from_breakdown, nonvat_net_from_breakdown, vat_amount_from_breakdown = _extract_vat_breakdown(text)
+    if vat_net is None or nonvat_net is None or vat_amount is None or total is None:
+        (
+            vat_net_from_breakdown,
+            nonvat_net_from_breakdown,
+            vat_amount_from_breakdown,
+            total_from_breakdown,
+        ) = _extract_vat_breakdown(text)
         if vat_net is None:
             vat_net = vat_net_from_breakdown
         if nonvat_net is None:
             nonvat_net = nonvat_net_from_breakdown
         if vat_amount is None:
             vat_amount = vat_amount_from_breakdown
+        if total is None:
+            total = total_from_breakdown
 
     if vat_net is None:
         vat_net = 0.0
