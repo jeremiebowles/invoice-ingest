@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
@@ -15,6 +16,20 @@ SAGE_API_BASE = "https://api.accounting.sage.com/v3.1"
 def _get_env(name: str) -> Optional[str]:
     value = os.getenv(name)
     return value.strip() if value else None
+
+
+def _sha256(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def sage_env_hashes() -> Dict[str, Optional[str]]:
+    return {
+        "SAGE_CLIENT_ID": _sha256(_get_env("SAGE_CLIENT_ID")),
+        "SAGE_CLIENT_SECRET": _sha256(_get_env("SAGE_CLIENT_SECRET")),
+        "SAGE_REFRESH_TOKEN": _sha256(_get_env("SAGE_REFRESH_TOKEN")),
+    }
 
 
 def _refresh_access_token() -> str:

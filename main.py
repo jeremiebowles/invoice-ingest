@@ -19,6 +19,7 @@ from app.sage_client import (
     exchange_auth_code,
     post_purchase_credit_note,
     post_purchase_invoice,
+    sage_env_hashes,
 )
 
 
@@ -213,6 +214,12 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh_token")
 
     return debug_refresh_token(str(refresh_token).strip())
+
+
+@app.get("/sage/env-hash")
+async def sage_env_hash(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    return {"hashes": sage_env_hashes()}
 
 
 @app.post("/sage/post")
