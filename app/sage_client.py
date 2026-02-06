@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
 import requests
+from google.cloud import secretmanager
 
 from app.models import InvoiceData
 
@@ -29,13 +30,34 @@ def sage_env_hashes() -> Dict[str, Optional[str]]:
         "SAGE_CLIENT_ID": _sha256(_get_env("SAGE_CLIENT_ID")),
         "SAGE_CLIENT_SECRET": _sha256(_get_env("SAGE_CLIENT_SECRET")),
         "SAGE_REFRESH_TOKEN": _sha256(_get_env("SAGE_REFRESH_TOKEN")),
+        "SAGE_REFRESH_SECRET_NAME": _sha256(_get_env("SAGE_REFRESH_SECRET_NAME")),
     }
+
+
+def _get_refresh_token() -> Optional[str]:
+    secret_name = _get_env("SAGE_REFRESH_SECRET_NAME")
+    if secret_name:
+        client = secretmanager.SecretManagerServiceClient()
+        version = client.access_secret_version(name=f"{secret_name}/versions/latest")
+        return version.payload.data.decode("utf-8").strip()
+    return _get_env("SAGE_REFRESH_TOKEN")
+
+
+def _store_refresh_token(refresh_token: str) -> None:
+    secret_name = _get_env("SAGE_REFRESH_SECRET_NAME")
+    if not secret_name:
+        return
+    client = secretmanager.SecretManagerServiceClient()
+    client.add_secret_version(
+        parent=secret_name,
+        payload={"data": refresh_token.encode("utf-8")},
+    )
 
 
 def _refresh_access_token() -> str:
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")
-    refresh_token = _get_env("SAGE_REFRESH_TOKEN")
+    refresh_token = _get_refresh_token()
 
     if not client_id or not client_secret or not refresh_token:
         raise RuntimeError("Missing Sage OAuth env vars")
@@ -52,7 +74,11 @@ def _refresh_access_token() -> str:
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()["access_token"]
+    data = resp.json()
+    new_refresh = data.get("refresh_token")
+    if new_refresh:
+        _store_refresh_token(new_refresh)
+    return data["access_token"]
 
 
 def check_sage_auth() -> Dict[str, Any]:
@@ -66,7 +92,7 @@ def check_sage_auth() -> Dict[str, Any]:
 def debug_refresh() -> Dict[str, Any]:
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")
-    refresh_token = _get_env("SAGE_REFRESH_TOKEN")
+    refresh_token = _get_refresh_token()
 
     if not client_id or not client_secret or not refresh_token:
         return {"status": "error", "message": "Missing Sage OAuth env vars"}
