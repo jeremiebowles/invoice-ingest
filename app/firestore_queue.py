@@ -48,3 +48,11 @@ def get_latest_parsed_record(limit: int = 10) -> Optional[tuple[str, Dict[str, A
         if data.get("parsed"):
             return doc.id, data
     return None
+
+
+def get_latest_record() -> Optional[tuple[str, Dict[str, Any]]]:
+    col = _get_collection()
+    query = col.order_by("created_at", direction=firestore.Query.DESCENDING).limit(1)
+    for doc in query.stream():
+        return doc.id, doc.to_dict() or {}
+    return None

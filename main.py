@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 
-from app.firestore_queue import enqueue_record, get_latest_parsed_record, update_record
+from app.firestore_queue import enqueue_record, get_latest_parsed_record, get_latest_record, update_record
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parse_utils import parse_date
@@ -380,6 +380,21 @@ async def sage_queue_latest(request: Request) -> Dict[str, Any]:
     latest = get_latest_parsed_record()
     if not latest:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No parsed records found")
+
+    record_id, record = latest
+    return {"status": "ok", "record_id": record_id, "record": record}
+
+
+@app.get("/sage/queue-latest-any")
+async def sage_queue_latest_any(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+
+    latest = get_latest_record()
+    if not latest:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No records found")
 
     record_id, record = latest
     return {"status": "ok", "record_id": record_id, "record": record}
