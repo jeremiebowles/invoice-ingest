@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import base64
+import email
+from email import policy
+from email.parser import BytesParser
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -177,6 +180,40 @@ def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, An
         if "pdf" in content_type or name.endswith(".pdf"):
             if attachment.get("Content"):
                 return attachment
+
+    return None
+
+
+def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    raw = payload.get("RawEmail") or payload.get("RawMessage") or payload.get("RawSource")
+    if not raw:
+        return None
+
+    raw_bytes = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", errors="ignore")
+    for attempt in range(2):
+        try:
+            msg = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+        except Exception:
+            msg = None
+
+        if msg:
+            for part in msg.walk():
+                content_type = (part.get_content_type() or "").lower()
+                filename = (part.get_filename() or "").lower()
+                if "pdf" in content_type or filename.endswith(".pdf"):
+                    payload_bytes = part.get_payload(decode=True)
+                    if payload_bytes:
+                        return {
+                            "Name": part.get_filename() or "attachment.pdf",
+                            "ContentType": content_type,
+                            "ContentBytes": payload_bytes,
+                        }
+        # If first parse failed to find a PDF and the raw data looks base64-ish, try decoding.
+        if attempt == 0 and isinstance(raw, str):
+            try:
+                raw_bytes = base64.b64decode(raw, validate=False)
+            except Exception:
+                break
 
     return None
 
@@ -496,7 +533,9 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
 
     pdf_attachment = _find_first_pdf_attachment(payload)
-    if not pdf_attachment:
+    raw_pdf_attachment = None if pdf_attachment else _extract_pdf_from_raw_email(payload)
+
+    if not pdf_attachment and not raw_pdf_attachment:
         if FIRESTORE_ENABLED:
             try:
                 enqueue_record(
@@ -514,14 +553,23 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
             "message": "No PDF attachment found",
         }
 
-    content = pdf_attachment.get("Content")
-    if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PDF attachment missing content")
+    if raw_pdf_attachment:
+        pdf_bytes = raw_pdf_attachment["ContentBytes"]
+        pdf_attachment = {
+            "Name": raw_pdf_attachment.get("Name"),
+            "ContentType": raw_pdf_attachment.get("ContentType"),
+            "ContentLength": len(pdf_bytes),
+        }
+        logger.info("Extracted PDF from RawEmail: %s", pdf_attachment.get("Name"))
+    else:
+        content = pdf_attachment.get("Content")
+        if not content:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PDF attachment missing content")
 
-    try:
-        pdf_bytes = base64.b64decode(content)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
+        try:
+            pdf_bytes = base64.b64decode(content)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
 
     text = extract_text_from_pdf(pdf_bytes)
     _log_pdf_text(text)
