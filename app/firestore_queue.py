@@ -32,3 +32,13 @@ def update_record(doc_id: str, fields: Dict[str, Any]) -> None:
     fields = dict(fields)
     fields["updated_at"] = firestore.SERVER_TIMESTAMP
     col.document(doc_id).set(fields, merge=True)
+
+
+def get_latest_parsed_record(limit: int = 10) -> Optional[tuple[str, Dict[str, Any]]]:
+    col = _get_collection()
+    query = col.order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
+    for doc in query.stream():
+        data = doc.to_dict() or {}
+        if data.get("parsed"):
+            return doc.id, data
+    return None

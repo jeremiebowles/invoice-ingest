@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 
-from app.firestore_queue import enqueue_record, update_record
+from app.firestore_queue import enqueue_record, get_latest_parsed_record, update_record
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parse_utils import parse_date
@@ -113,6 +113,41 @@ def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
     if hasattr(invoice, "dict"):
         return invoice.dict()  # Pydantic v1
     return dict(invoice)
+
+
+def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
+    supplier_reference = payload.get("supplier_reference")
+    invoice_date_raw = payload.get("invoice_date")
+    if not supplier_reference or not invoice_date_raw:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing supplier_reference or invoice_date",
+        )
+
+    invoice_date = parse_date(str(invoice_date_raw))
+    if not invoice_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invoice_date")
+
+    vat_net = float(payload.get("vat_net", 0) or 0)
+    nonvat_net = float(payload.get("nonvat_net", 0) or 0)
+    vat_amount = float(payload.get("vat_amount", 0) or 0)
+    total = float(payload.get("total", vat_net + nonvat_net + vat_amount) or 0)
+
+    return InvoiceData(
+        supplier=payload.get("supplier") or "CLF",
+        supplier_reference=str(supplier_reference),
+        invoice_date=invoice_date,
+        due_date=None,
+        description=payload.get("description") or "Purchases",
+        is_credit=bool(payload.get("is_credit", False)),
+        deliver_to_postcode=payload.get("deliver_to_postcode"),
+        ledger_account=payload.get("ledger_account"),
+        vat_net=vat_net,
+        nonvat_net=nonvat_net,
+        vat_amount=vat_amount,
+        total=total,
+        warnings=[],
+    )
 
 
 def _log_pdf_text(text: str) -> None:
@@ -234,38 +269,7 @@ async def sage_post(request: Request) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
 
-    supplier_reference = payload.get("supplier_reference")
-    invoice_date_raw = payload.get("invoice_date")
-    if not supplier_reference or not invoice_date_raw:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing supplier_reference or invoice_date",
-        )
-
-    invoice_date = parse_date(str(invoice_date_raw))
-    if not invoice_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invoice_date")
-
-    vat_net = float(payload.get("vat_net", 0) or 0)
-    nonvat_net = float(payload.get("nonvat_net", 0) or 0)
-    vat_amount = float(payload.get("vat_amount", 0) or 0)
-    total = float(payload.get("total", vat_net + nonvat_net + vat_amount) or 0)
-
-    invoice = InvoiceData(
-        supplier=payload.get("supplier") or "CLF",
-        supplier_reference=str(supplier_reference),
-        invoice_date=invoice_date,
-        due_date=None,
-        description=payload.get("description") or "Purchases",
-        is_credit=bool(payload.get("is_credit", False)),
-        deliver_to_postcode=payload.get("deliver_to_postcode"),
-        ledger_account=payload.get("ledger_account"),
-        vat_net=vat_net,
-        nonvat_net=nonvat_net,
-        vat_amount=vat_amount,
-        total=total,
-        warnings=[],
-    )
+    invoice = _invoice_from_payload(payload)
 
     record_id = None
     if FIRESTORE_ENABLED:
@@ -308,6 +312,52 @@ async def sage_post(request: Request) -> Dict[str, Any]:
             update_record(record_id, {"status": "skipped", "sage": sage_result})
         else:
             update_record(record_id, {"status": "unknown", "sage": sage_result})
+
+    return {"status": "ok", "sage": sage_result, "record_id": record_id}
+
+
+@app.post("/sage/post-latest")
+async def sage_post_latest(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+
+    latest = get_latest_parsed_record()
+    if not latest:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No parsed records found")
+
+    record_id, record = latest
+    parsed = record.get("parsed")
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Latest record missing parsed data")
+
+    invoice = _invoice_from_payload(parsed)
+
+    if not SAGE_ENABLED:
+        logger.info("Sage disabled; skipping /sage/post-latest")
+        update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+        return {"status": "disabled", "record_id": record_id}
+
+    try:
+        if invoice.is_credit:
+            sage_result = post_purchase_credit_note(invoice)
+        else:
+            sage_result = post_purchase_invoice(invoice)
+    except Exception as exc:
+        logger.exception("Sage post failed: %s", exc)
+        update_record(record_id, {"status": "error", "error": str(exc)})
+        return {"status": "error", "message": str(exc), "record_id": record_id}
+
+    if isinstance(sage_result, dict) and sage_result.get("id"):
+        logger.info("Sage created id: %s", sage_result.get("id"))
+
+    if isinstance(sage_result, dict) and sage_result.get("id"):
+        update_record(record_id, {"status": "posted", "sage": sage_result})
+    elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+        update_record(record_id, {"status": "skipped", "sage": sage_result})
+    else:
+        update_record(record_id, {"status": "unknown", "sage": sage_result})
 
     return {"status": "ok", "sage": sage_result, "record_id": record_id}
 
