@@ -11,9 +11,15 @@ def _get_env(name: str) -> Optional[str]:
     return value.strip() if value else None
 
 
+def _get_database() -> Optional[str]:
+    value = _get_env("FIRESTORE_DATABASE")
+    return value or None
+
+
 def _get_collection():
     collection = _get_env("FIRESTORE_COLLECTION") or "sage_queue"
-    client = firestore.Client()
+    database = _get_database()
+    client = firestore.Client(database=database)
     return client.collection(collection)
 
 
