@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import hashlib
+import logging
 from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
@@ -12,6 +13,7 @@ from app.models import InvoiceData
 
 SAGE_TOKEN_URL = "https://oauth.accounting.sage.com/token"
 SAGE_API_BASE = "https://api.accounting.sage.com/v3.1"
+logger = logging.getLogger(__name__)
 
 
 def _get_env(name: str) -> Optional[str]:
@@ -242,28 +244,63 @@ def _sage_headers(access_token: str, business_id: str) -> Dict[str, str]:
 
 
 def _already_exists(
-    access_token: str, business_id: str, endpoint: str, number: str
+    access_token: str,
+    business_id: str,
+    endpoint: str,
+    number: str,
+    number_field: str,
 ) -> bool:
     if not number or number == "UNKNOWN":
         return False
-    resp = requests.get(
-        f"{SAGE_API_BASE}/{endpoint}",
-        headers=_sage_headers(access_token, business_id),
-        params={"search": number, "items_per_page": 50},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    items = data.get("$items") or []
-    for item in items:
-        if not isinstance(item, dict):
+    candidates = [
+        {"search": number, "items_per_page": 50},
+        {number_field: number},
+        {"reference": number},
+        {"filter": f"{number_field} eq '{number}'"},
+        {"filter": f"reference eq '{number}'"},
+    ]
+    for params in candidates:
+        try:
+            resp = requests.get(
+                f"{SAGE_API_BASE}/{endpoint}",
+                headers=_sage_headers(access_token, business_id),
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                continue
+            data = resp.json()
+            items = data.get("$items") or []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if item.get(number_field) == number:
+                    return True
+                if item.get("reference") == number:
+                    return True
+        except Exception as exc:
+            logger.info("Sage duplicate check failed for %s: %s", params, exc)
             continue
-        if item.get("invoice_number") == number:
-            return True
-        if item.get("credit_note_number") == number:
-            return True
-        if item.get("reference") == number:
-            return True
+
+    try:
+        resp = requests.get(
+            f"{SAGE_API_BASE}/transactions",
+            headers=_sage_headers(access_token, business_id),
+            params={"search": number, "items_per_page": 50},
+            timeout=30,
+        )
+        if resp.status_code < 400:
+            data = resp.json()
+            items = data.get("$items") or []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("reference") == number:
+                    return True
+                if item.get("displayed_as") == number:
+                    return True
+    except Exception as exc:
+        logger.info("Sage duplicate check failed for transactions: %s", exc)
     return False
 
 
@@ -283,7 +320,13 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     )
     due_date = _compute_due_date(invoice.invoice_date)
 
-    if _already_exists(access_token, business_id, "purchase_invoices", invoice.supplier_reference):
+    if _already_exists(
+        access_token,
+        business_id,
+        "purchase_invoices",
+        invoice.supplier_reference,
+        "invoice_number",
+    ):
         return {"status": "skipped", "reason": "already_exists", "number": invoice.supplier_reference}
 
     payload = {
@@ -327,7 +370,11 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
     due_date = _compute_due_date(invoice.invoice_date)
 
     if _already_exists(
-        access_token, business_id, "purchase_credit_notes", invoice.supplier_reference
+        access_token,
+        business_id,
+        "purchase_credit_notes",
+        invoice.supplier_reference,
+        "credit_note_number",
     ):
         return {"status": "skipped", "reason": "already_exists", "number": invoice.supplier_reference}
 
