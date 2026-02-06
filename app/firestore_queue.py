@@ -56,3 +56,20 @@ def get_latest_record() -> Optional[tuple[str, Dict[str, Any]]]:
     for doc in query.stream():
         return doc.id, doc.to_dict() or {}
     return None
+
+
+def test_roundtrip() -> Dict[str, Any]:
+    col = _get_collection()
+    doc_ref = col.document()
+    payload = {
+        "status": "firestore_test",
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    doc_ref.set(payload)
+    snapshot = doc_ref.get()
+    return {
+        "id": doc_ref.id,
+        "exists": snapshot.exists,
+        "data": snapshot.to_dict() or {},
+    }

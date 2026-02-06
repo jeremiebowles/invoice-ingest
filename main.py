@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 
-from app.firestore_queue import enqueue_record, get_latest_parsed_record, get_latest_record, update_record
+from app.firestore_queue import enqueue_record, get_latest_parsed_record, get_latest_record, test_roundtrip, update_record
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parse_utils import parse_date
@@ -398,6 +398,22 @@ async def sage_queue_latest_any(request: Request) -> Dict[str, Any]:
 
     record_id, record = latest
     return {"status": "ok", "record_id": record_id, "record": record}
+
+
+@app.get("/sage/firestore-test")
+async def sage_firestore_test(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+
+    try:
+        result = test_roundtrip()
+    except Exception as exc:
+        logger.exception("Firestore test failed: %s", exc)
+        return {"status": "error", "message": str(exc)}
+
+    return {"status": "ok", "result": result}
 
 
 @app.get("/sage/auth-url")
