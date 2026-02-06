@@ -73,3 +73,11 @@ def test_roundtrip() -> Dict[str, Any]:
         "exists": snapshot.exists,
         "data": snapshot.to_dict() or {},
     }
+
+
+def list_records(limit: int = 5) -> list[Dict[str, Any]]:
+    col = _get_collection()
+    results: list[Dict[str, Any]] = []
+    for doc in col.limit(limit).stream():
+        results.append({"id": doc.id, "data": doc.to_dict() or {}})
+    return results
