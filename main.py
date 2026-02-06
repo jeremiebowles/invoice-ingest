@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 
 from app.firestore_queue import (
     enqueue_record,
+    get_client_info,
     get_latest_parsed_record,
     get_latest_record,
     list_records,
@@ -470,6 +471,12 @@ async def sage_queue_list(request: Request) -> Dict[str, Any]:
     return {"status": "ok", "records": list_records()}
 
 
+@app.get("/sage/firestore-info")
+async def sage_firestore_info(request: Request) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    return {"status": "ok", "info": get_client_info()}
+
+
 @app.get("/sage/auth-url")
 async def sage_auth_url(request: Request) -> Dict[str, str]:
     _check_basic_auth(request)
@@ -570,6 +577,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
             pdf_bytes = base64.b64decode(content)
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
+        logger.info("Extracted PDF from attachment content: %s", pdf_attachment.get("Name"))
 
     text = extract_text_from_pdf(pdf_bytes)
     _log_pdf_text(text)
@@ -597,6 +605,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                     "parsed": _invoice_to_dict(invoice),
                 }
             )
+            logger.info("Enqueued Firestore record: %s", record_id)
         except Exception:
             logger.exception("Failed to write Firestore record")
 

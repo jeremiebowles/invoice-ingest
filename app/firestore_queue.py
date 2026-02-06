@@ -81,3 +81,10 @@ def list_records(limit: int = 5) -> list[Dict[str, Any]]:
     for doc in col.limit(limit).stream():
         results.append({"id": doc.id, "data": doc.to_dict() or {}})
     return results
+
+
+def get_client_info() -> Dict[str, Any]:
+    collection = _get_env("FIRESTORE_COLLECTION") or "sage_queue"
+    database = _get_database() or "(default)"
+    client = firestore.Client(database=_get_database())
+    return {"project": client.project, "database": database, "collection": collection}
