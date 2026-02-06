@@ -17,6 +17,7 @@ from app.firestore_queue import (
     get_client_info,
     get_latest_parsed_record,
     get_latest_record,
+    has_recent_posted_match,
     list_records,
     test_roundtrip,
     update_record,
@@ -118,6 +119,25 @@ def _enforce_request_size(request: Request) -> None:
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Request too large: {length} bytes (max {limit})",
         )
+
+
+def _is_duplicate_post(invoice: InvoiceData) -> bool:
+    if not FIRESTORE_ENABLED:
+        return False
+    try:
+        invoice_date = (
+            invoice.invoice_date.isoformat()
+            if hasattr(invoice.invoice_date, "isoformat")
+            else str(invoice.invoice_date)
+        )
+        return has_recent_posted_match(
+            invoice.supplier_reference,
+            invoice_date,
+            invoice.is_credit,
+        )
+    except Exception as exc:
+        logger.info("Duplicate check failed, continuing: %s", exc)
+        return False
 
 
 def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
@@ -356,6 +376,11 @@ async def sage_post(request: Request) -> Dict[str, Any]:
         return {"status": "disabled", "record_id": record_id}
 
     try:
+        if _is_duplicate_post(invoice):
+            skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
+            if record_id:
+                update_record(record_id, {"status": "skipped", "sage": skip})
+            return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
         else:
@@ -404,6 +429,10 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
         return {"status": "disabled", "record_id": record_id}
 
     try:
+        if _is_duplicate_post(invoice):
+            skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
+            update_record(record_id, {"status": "skipped", "sage": skip})
+            return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
         else:
@@ -631,6 +660,21 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     sage_result = None
     if SAGE_ENABLED:
         try:
+            if _is_duplicate_post(invoice):
+                sage_result = {
+                    "status": "skipped",
+                    "reason": "duplicate_local",
+                    "number": invoice.supplier_reference,
+                }
+                if record_id:
+                    update_record(record_id, {"status": "skipped", "sage": sage_result})
+                return {
+                    "status": "ok",
+                    "max_request_bytes": _max_request_bytes(),
+                    "parsed": _invoice_to_dict(invoice),
+                    "sage": sage_result,
+                    "record_id": record_id,
+                }
             if invoice.is_credit:
                 sage_result = post_purchase_credit_note(invoice)
             else:

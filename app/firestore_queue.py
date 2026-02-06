@@ -88,3 +88,28 @@ def get_client_info() -> Dict[str, Any]:
     database = _get_database() or "(default)"
     client = firestore.Client(database=_get_database())
     return {"project": client.project, "database": database, "collection": collection}
+
+
+def has_recent_posted_match(
+    supplier_reference: Optional[str],
+    invoice_date: Optional[str],
+    is_credit: Optional[bool],
+    limit: int = 200,
+) -> bool:
+    if not supplier_reference or not invoice_date:
+        return False
+    col = _get_collection()
+    query = col.order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
+    for doc in query.stream():
+        data = doc.to_dict() or {}
+        if data.get("status") != "posted":
+            continue
+        parsed = data.get("parsed") or {}
+        if parsed.get("supplier_reference") != supplier_reference:
+            continue
+        if parsed.get("invoice_date") != invoice_date:
+            continue
+        if is_credit is not None and parsed.get("is_credit") != is_credit:
+            continue
+        return True
+    return False
