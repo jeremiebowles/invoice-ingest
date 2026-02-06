@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
 
+from app.firestore_queue import enqueue_record, update_record
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parse_utils import parse_date
@@ -32,6 +33,7 @@ BASIC_PASS = os.getenv("BASIC_PASS")
 MAX_REQUEST_BYTES = os.getenv("MAX_REQUEST_BYTES")
 LOG_PDF_TEXT = os.getenv("LOG_PDF_TEXT", "").lower() in {"1", "true", "yes", "on"}
 SAGE_ENABLED = os.getenv("SAGE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
+FIRESTORE_ENABLED = os.getenv("FIRESTORE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -153,6 +155,26 @@ def _text_looks_like_clf(text: str) -> bool:
     return "clf distribution" in normalized or "clf distribution ltd" in normalized
 
 
+def _payload_meta(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "message_id": payload.get("MessageID") or payload.get("MessageId"),
+        "subject": payload.get("Subject"),
+        "from": payload.get("From"),
+        "from_email": (payload.get("FromFull") or {}).get("Email"),
+        "to": payload.get("To"),
+    }
+
+
+def _attachment_meta(
+    attachment: Dict[str, Any], pdf_size: Optional[int] = None
+) -> Dict[str, Any]:
+    return {
+        "name": attachment.get("Name"),
+        "content_type": attachment.get("ContentType"),
+        "size_bytes": pdf_size,
+    }
+
+
 @app.get("/health")
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
@@ -238,9 +260,25 @@ async def sage_post(request: Request) -> Dict[str, Any]:
         warnings=[],
     )
 
+    record_id = None
+    if FIRESTORE_ENABLED:
+        try:
+            record_id = enqueue_record(
+                {
+                    "status": "manual_post",
+                    "source": "manual",
+                    "payload_meta": {"source": "sage_post"},
+                    "parsed": _invoice_to_dict(invoice),
+                }
+            )
+        except Exception:
+            logger.exception("Failed to write Firestore record for manual post")
+
     if not SAGE_ENABLED:
         logger.info("Sage disabled; skipping /sage/post")
-        return {"status": "disabled"}
+        if record_id:
+            update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+        return {"status": "disabled", "record_id": record_id}
 
     try:
         if invoice.is_credit:
@@ -249,12 +287,22 @@ async def sage_post(request: Request) -> Dict[str, Any]:
             sage_result = post_purchase_invoice(invoice)
     except Exception as exc:
         logger.exception("Sage post failed: %s", exc)
-        return {"status": "error", "message": str(exc)}
+        if record_id:
+            update_record(record_id, {"status": "error", "error": str(exc)})
+        return {"status": "error", "message": str(exc), "record_id": record_id}
 
     if isinstance(sage_result, dict) and sage_result.get("id"):
         logger.info("Sage created id: %s", sage_result.get("id"))
 
-    return {"status": "ok", "sage": sage_result}
+    if record_id:
+        if isinstance(sage_result, dict) and sage_result.get("id"):
+            update_record(record_id, {"status": "posted", "sage": sage_result})
+        elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+            update_record(record_id, {"status": "skipped", "sage": sage_result})
+        else:
+            update_record(record_id, {"status": "unknown", "sage": sage_result})
+
+    return {"status": "ok", "sage": sage_result, "record_id": record_id}
 
 
 @app.get("/sage/auth-url")
@@ -321,6 +369,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     pdf_attachment = _find_first_pdf_attachment(payload)
     if not pdf_attachment:
+        if FIRESTORE_ENABLED:
+            try:
+                enqueue_record(
+                    {
+                        "status": "no_pdf",
+                        "source": "postmark",
+                        "payload_meta": _payload_meta(payload),
+                    }
+                )
+            except Exception:
+                logger.exception("Failed to write Firestore record for no-pdf payload")
         return {
             "status": "ok",
             "max_request_bytes": _max_request_bytes(),
@@ -350,6 +409,21 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
 
+    record_id = None
+    if FIRESTORE_ENABLED:
+        try:
+            record_id = enqueue_record(
+                {
+                    "status": "parsed",
+                    "source": "postmark",
+                    "payload_meta": _payload_meta(payload),
+                    "attachment": _attachment_meta(pdf_attachment, len(pdf_bytes)),
+                    "parsed": _invoice_to_dict(invoice),
+                }
+            )
+        except Exception:
+            logger.exception("Failed to write Firestore record")
+
     sage_result = None
     if SAGE_ENABLED:
         try:
@@ -362,15 +436,27 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                     logger.info("Sage created id: %s", sage_result.get("id"))
                 elif sage_result.get("status") == "skipped":
                     logger.info("Sage post skipped: %s", sage_result)
+            if record_id:
+                if isinstance(sage_result, dict) and sage_result.get("id"):
+                    update_record(record_id, {"status": "posted", "sage": sage_result})
+                elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+                    update_record(record_id, {"status": "skipped", "sage": sage_result})
+                else:
+                    update_record(record_id, {"status": "unknown", "sage": sage_result})
         except Exception as exc:
             logger.exception("Sage post failed: %s", exc)
             sage_result = {"status": "error", "message": str(exc)}
+            if record_id:
+                update_record(record_id, {"status": "error", "error": str(exc)})
     else:
         logger.info("Sage disabled; skipping post")
+        if record_id:
+            update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
 
     return {
         "status": "ok",
         "max_request_bytes": _max_request_bytes(),
         "parsed": _invoice_to_dict(invoice),
         "sage": sage_result,
+        "record_id": record_id,
     }
