@@ -6,6 +6,7 @@ from email import policy
 from email.parser import BytesParser
 import logging
 import os
+from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -124,6 +125,16 @@ def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
     if hasattr(invoice, "dict"):
         return invoice.dict()  # Pydantic v1
     return dict(invoice)
+
+
+def _serialize_for_storage(value: Any) -> Any:
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _serialize_for_storage(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize_for_storage(v) for v in value]
+    return value
 
 
 def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
@@ -324,7 +335,7 @@ async def sage_post(request: Request) -> Dict[str, Any]:
                     "status": "manual_post",
                     "source": "manual",
                     "payload_meta": {"source": "sage_post"},
-                    "parsed": _invoice_to_dict(invoice),
+                    "parsed": _serialize_for_storage(_invoice_to_dict(invoice)),
                 }
             )
         except Exception:
@@ -602,7 +613,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                     "source": "postmark",
                     "payload_meta": _payload_meta(payload),
                     "attachment": _attachment_meta(pdf_attachment, len(pdf_bytes)),
-                    "parsed": _invoice_to_dict(invoice),
+                    "parsed": _serialize_for_storage(_invoice_to_dict(invoice)),
                 }
             )
             logger.info("Enqueued Firestore record: %s", record_id)
