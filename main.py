@@ -347,7 +347,15 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
     except Exception as exc:
         logger.exception("Sage post failed: %s", exc)
         update_record(record_id, {"status": "error", "error": str(exc)})
-        return {"status": "error", "message": str(exc), "record_id": record_id}
+        return {
+            "status": "error",
+            "message": str(exc),
+            "record_id": record_id,
+            "debug": {
+                "invoice": _invoice_to_dict(invoice),
+                "record_id": record_id,
+            },
+        }
 
     if isinstance(sage_result, dict) and sage_result.get("id"):
         logger.info("Sage created id: %s", sage_result.get("id"))
