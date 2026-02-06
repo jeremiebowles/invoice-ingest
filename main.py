@@ -124,6 +124,20 @@ def _enforce_request_size(request: Request) -> None:
 def _is_duplicate_post(invoice: InvoiceData) -> bool:
     if not FIRESTORE_ENABLED:
         return False
+
+
+def _duplicate_payload(invoice: InvoiceData) -> Dict[str, Any]:
+    invoice_date = (
+        invoice.invoice_date.isoformat()
+        if hasattr(invoice.invoice_date, "isoformat")
+        else str(invoice.invoice_date)
+    )
+    return {
+        "reason": "duplicate_local",
+        "supplier_reference": invoice.supplier_reference,
+        "invoice_date": invoice_date,
+        "is_credit": invoice.is_credit,
+    }
     try:
         invoice_date = (
             invoice.invoice_date.isoformat()
@@ -377,9 +391,10 @@ async def sage_post(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
+            duplicate = _duplicate_payload(invoice)
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
             if record_id:
-                update_record(record_id, {"status": "skipped", "sage": skip})
+                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
             return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
@@ -430,8 +445,9 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
+            duplicate = _duplicate_payload(invoice)
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
-            update_record(record_id, {"status": "skipped", "sage": skip})
+            update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
             return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
@@ -661,13 +677,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     if SAGE_ENABLED:
         try:
             if _is_duplicate_post(invoice):
+                duplicate = _duplicate_payload(invoice)
                 sage_result = {
                     "status": "skipped",
                     "reason": "duplicate_local",
                     "number": invoice.supplier_reference,
                 }
                 if record_id:
-                    update_record(record_id, {"status": "skipped", "sage": sage_result})
+                    update_record(
+                        record_id,
+                        {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                    )
                 return {
                     "status": "ok",
                     "max_request_bytes": _max_request_bytes(),
