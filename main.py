@@ -7,6 +7,7 @@ from email.parser import BytesParser
 import logging
 import os
 from datetime import date, datetime
+import re
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -146,7 +147,14 @@ def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
             detail="Missing supplier_reference or invoice_date",
         )
 
-    invoice_date = parse_date(str(invoice_date_raw))
+    invoice_date_text = str(invoice_date_raw)
+    if re.match(r"^\\d{4}-\\d{2}-\\d{2}$", invoice_date_text):
+        try:
+            invoice_date = date.fromisoformat(invoice_date_text)
+        except ValueError:
+            invoice_date = None
+    else:
+        invoice_date = parse_date(invoice_date_text)
     if not invoice_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invoice_date")
 
