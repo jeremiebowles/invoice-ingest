@@ -256,8 +256,10 @@ def _already_exists(
         {"search": number, "items_per_page": 50},
         {number_field: number},
         {"reference": number},
+        {"vendor_reference": number},
         {"filter": f"{number_field} eq '{number}'"},
         {"filter": f"reference eq '{number}'"},
+        {"filter": f"vendor_reference eq '{number}'"},
     ]
     for params in candidates:
         try:
@@ -277,6 +279,8 @@ def _already_exists(
                 if item.get(number_field) == number:
                     return True
                 if item.get("reference") == number:
+                    return True
+                if item.get("vendor_reference") == number:
                     return True
         except Exception as exc:
             logger.info("Sage duplicate check failed for %s: %s", params, exc)
@@ -336,6 +340,7 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
             "due_date": due_date.isoformat(),
             "reference": invoice.supplier_reference,
             "invoice_number": invoice.supplier_reference,
+            "vendor_reference": invoice.supplier_reference,
             "net_amount": net_amount,
             "tax_amount": vat_amount,
             "total_amount": total_amount,
@@ -385,6 +390,7 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
             "due_date": due_date.isoformat(),
             "reference": invoice.supplier_reference,
             "credit_note_number": invoice.supplier_reference,
+            "vendor_reference": invoice.supplier_reference,
             "net_amount": net_amount,
             "tax_amount": vat_amount,
             "total_amount": total_amount,
