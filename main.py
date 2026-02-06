@@ -148,7 +148,7 @@ def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
         )
 
     invoice_date_text = str(invoice_date_raw)
-    if re.match(r"^\\d{4}-\\d{2}-\\d{2}$", invoice_date_text):
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", invoice_date_text):
         try:
             invoice_date = date.fromisoformat(invoice_date_text)
         except ValueError:
