@@ -552,6 +552,23 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
         except Exception:
             logger.exception("Failed to reserve message_id; continuing")
 
+    message_id = payload.get("MessageID") or payload.get("MessageId")
+    if FIRESTORE_ENABLED and message_id:
+        try:
+            reserved = reserve_message_id(
+                str(message_id),
+                {"status": "received", "source": "postmark"},
+            )
+            if not reserved:
+                return {
+                    "status": "ok",
+                    "max_request_bytes": _max_request_bytes(),
+                    "message": "Duplicate message_id",
+                    "message_id": message_id,
+                }
+        except Exception:
+            logger.exception("Failed to reserve message_id; continuing")
+
     refresh_token = payload.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh_token")
