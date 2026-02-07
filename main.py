@@ -56,6 +56,16 @@ logger = logging.getLogger("invoice-ingest")
 app = FastAPI()
 
 
+@app.get("/version")
+async def version() -> Dict[str, Any]:
+    return {
+        "status": "ok",
+        "revision": os.getenv("K_REVISION"),
+        "service": os.getenv("K_SERVICE"),
+        "commit": os.getenv("COMMIT_SHA") or os.getenv("REVISION_ID"),
+    }
+
+
 BASIC_USER = os.getenv("BASIC_USER")
 BASIC_PASS = os.getenv("BASIC_PASS")
 MAX_REQUEST_BYTES = os.getenv("MAX_REQUEST_BYTES")
