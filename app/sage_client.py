@@ -256,9 +256,11 @@ def _already_exists(
     endpoint: str,
     number: str,
     number_field: str,
+    contact_id: Optional[str] = None,
 ) -> bool:
     if not number or number == "UNKNOWN":
         return False
+    contact_filter = f" and contact_id eq '{contact_id}'" if contact_id else ""
     candidates = [
         {"search": number, "items_per_page": 50},
         {number_field: number},
@@ -267,7 +269,15 @@ def _already_exists(
         {"filter": f"{number_field} eq '{number}'"},
         {"filter": f"reference eq '{number}'"},
         {"filter": f"vendor_reference eq '{number}'"},
+        {"filter": f"vendor_reference eq '{number}'{contact_filter}"},
+        {"filter": f"reference eq '{number}'{contact_filter}"},
+        {"filter": f"{number_field} eq '{number}'{contact_filter}"},
     ]
+    if contact_id:
+        candidates.insert(
+            0, {"contact_id": contact_id, "vendor_reference": number, "items_per_page": 50}
+        )
+        candidates.insert(1, {"contact_id": contact_id, "reference": number, "items_per_page": 50})
     for params in candidates:
         try:
             resp = requests.get(
@@ -289,6 +299,11 @@ def _already_exists(
                     return True
                 if item.get("vendor_reference") == number:
                     return True
+                if contact_id and item.get("contact", {}).get("id") == contact_id:
+                    if item.get("vendor_reference") == number:
+                        return True
+                    if item.get("reference") == number:
+                        return True
         except Exception as exc:
             logger.info("Sage duplicate check failed for %s: %s", params, exc)
             continue
@@ -337,6 +352,7 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
         "purchase_invoices",
         invoice.supplier_reference,
         "invoice_number",
+        contact_id,
     ):
         return {"status": "skipped", "reason": "already_exists", "number": invoice.supplier_reference}
 
@@ -387,6 +403,7 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
         "purchase_credit_notes",
         invoice.supplier_reference,
         "credit_note_number",
+        contact_id,
     ):
         return {"status": "skipped", "reason": "already_exists", "number": invoice.supplier_reference}
 
