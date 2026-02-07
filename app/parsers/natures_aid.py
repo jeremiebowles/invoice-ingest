@@ -60,6 +60,38 @@ def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Option
     return net, vat, total
 
 
+def _extract_vat_split_from_lines(text: str) -> tuple[Optional[float], Optional[float]]:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    in_lines = False
+    last_vat = None
+    vat_net = 0.0
+    nonvat_net = 0.0
+    found = False
+    for line in lines:
+        lower = line.lower()
+        if lower == "vat %":
+            in_lines = True
+            continue
+        if lower in {"sub total", "net total", "invoice discount", "net total"}:
+            break
+        if not in_lines:
+            continue
+        if re.fullmatch(r"(0|0\.0|0\.00|20|20\.0|20\.00)", line):
+            last_vat = float(line)
+            continue
+        amount = parse_money(line)
+        if amount is not None and last_vat is not None:
+            if last_vat == 0:
+                nonvat_net += amount
+            else:
+                vat_net += amount
+            last_vat = None
+            found = True
+    if not found:
+        return None, None
+    return round(vat_net, 2), round(nonvat_net, 2)
+
+
 def parse_natures_aid(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -83,6 +115,7 @@ def parse_natures_aid(text: str) -> InvoiceData:
         due_date = invoice_date + timedelta(days=30)
 
     vat_net, vat_amount, total = _extract_totals(text or "")
+    split_vat_net, split_nonvat_net = _extract_vat_split_from_lines(text or "")
     if vat_net is None:
         warnings.append("VAT net amount not found")
         vat_net = 0.0
@@ -93,7 +126,11 @@ def parse_natures_aid(text: str) -> InvoiceData:
         total = round(vat_net + vat_amount, 2)
         warnings.append("Total amount not found")
 
-    nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
+    if split_vat_net is not None and split_nonvat_net is not None:
+        vat_net = split_vat_net
+        nonvat_net = split_nonvat_net
+    else:
+        nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
 
     if not approx_equal(vat_net + nonvat_net + vat_amount, total):
         warnings.append("Totals do not reconcile (net + vat != total)")
