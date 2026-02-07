@@ -24,6 +24,7 @@ from app.firestore_queue import (
 )
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
+from app.parsers.viridian import parse_viridian
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
 from app.sage_client import (
@@ -287,6 +288,16 @@ def _extract_sender_email(payload: Dict[str, Any]) -> Optional[str]:
 def _text_looks_like_clf(text: str) -> bool:
     normalized = (text or "").lower()
     return "clf distribution" in normalized or "clf distribution ltd" in normalized
+
+
+def _text_looks_like_viridian(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "viridian international" in normalized
+        or "viridian nutrition" in normalized
+        or "viridian-nutrition.com" in normalized
+        or "gb738632315" in normalized
+    )
 
 
 def _payload_meta(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -648,13 +659,19 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     sender_email = _extract_sender_email(payload) or ""
     is_clf_sender = sender_email.endswith("@clfdistribution.com")
-    if not is_clf_sender and _text_looks_like_clf(text):
-        is_clf_sender = True
-        logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
-    if not is_clf_sender:
-        logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
+    is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
 
-    invoice = parse_clf(text)
+    if is_viridian_sender or _text_looks_like_viridian(text):
+        if not is_viridian_sender:
+            logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
+        invoice = parse_viridian(text)
+    else:
+        if not is_clf_sender and _text_looks_like_clf(text):
+            is_clf_sender = True
+            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
+        if not is_clf_sender:
+            logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
+        invoice = parse_clf(text)
     logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
 
     record_id = None
