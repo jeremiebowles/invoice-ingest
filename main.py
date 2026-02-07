@@ -18,6 +18,7 @@ from app.firestore_queue import (
     get_latest_parsed_record,
     get_latest_record,
     has_recent_posted_match,
+    increment_rate_limit,
     list_records,
     test_roundtrip,
     update_record,
@@ -76,6 +77,8 @@ LOG_PDF_TEXT = os.getenv("LOG_PDF_TEXT", "").lower() in {"1", "true", "yes", "on
 SAGE_ENABLED = os.getenv("SAGE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 FIRESTORE_ENABLED = os.getenv("FIRESTORE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 ALLOWED_FORWARDERS = os.getenv("ALLOWED_FORWARDERS", "")
+BLOCKLIST_KEYWORDS = os.getenv("BLOCKLIST_KEYWORDS", "")
+RATE_LIMIT_PER_DAY = os.getenv("RATE_LIMIT_PER_DAY", "20")
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -162,6 +165,48 @@ def _enforce_forwarder_whitelist(sender_email: str) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sender not allowed",
+        )
+
+
+def _blocklist_keywords() -> list[str]:
+    if not BLOCKLIST_KEYWORDS:
+        return []
+    return [kw.strip().lower() for kw in BLOCKLIST_KEYWORDS.split(",") if kw.strip()]
+
+
+def _enforce_blocklist(subject: str) -> None:
+    keywords = _blocklist_keywords()
+    if not keywords:
+        return
+    subject_lower = (subject or "").lower()
+    for kw in keywords:
+        if kw and kw in subject_lower:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Blocked by subject keyword",
+            )
+
+
+def _rate_limit_key(sender_email: str, now: Optional[datetime] = None) -> str:
+    stamp = (now or datetime.utcnow()).strftime("%Y-%m-%d")
+    return f"{sender_email.lower()}:{stamp}"
+
+
+def _enforce_rate_limit(sender_email: str) -> None:
+    try:
+        limit = int(RATE_LIMIT_PER_DAY)
+    except ValueError:
+        limit = 0
+    if limit <= 0:
+        return
+    if not FIRESTORE_ENABLED:
+        return
+    key = _rate_limit_key(sender_email)
+    count = increment_rate_limit(key, limit)
+    if count > limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: {count}/{limit} per day",
         )
 
 
@@ -818,7 +863,9 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     _log_pdf_text(text)
 
     sender_email = _extract_sender_email(payload) or ""
+    _enforce_blocklist(payload.get("Subject") or "")
     _enforce_forwarder_whitelist(sender_email)
+    _enforce_rate_limit(sender_email)
     logger.info(
         "Postmark sender fields: From=%s FromFull.Email=%s OriginalSender=%s",
         payload.get("From"),

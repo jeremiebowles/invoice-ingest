@@ -113,3 +113,20 @@ def has_recent_posted_match(
             continue
         return True
     return False
+
+
+def increment_rate_limit(key: str, limit: int) -> int:
+    collection = _get_env("FIRESTORE_RATE_LIMIT_COLLECTION") or "rate_limits"
+    database = _get_database()
+    client = firestore.Client(database=database)
+    doc_ref = client.collection(collection).document(key)
+    doc_ref.set(
+        {"count": firestore.Increment(1), "updated_at": firestore.SERVER_TIMESTAMP},
+        merge=True,
+    )
+    snapshot = doc_ref.get()
+    data = snapshot.to_dict() or {}
+    count = int(data.get("count") or 0)
+    if limit > 0 and count > limit:
+        return count
+    return count
