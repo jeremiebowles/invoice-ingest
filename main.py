@@ -75,6 +75,7 @@ MAX_REQUEST_BYTES = os.getenv("MAX_REQUEST_BYTES")
 LOG_PDF_TEXT = os.getenv("LOG_PDF_TEXT", "").lower() in {"1", "true", "yes", "on"}
 SAGE_ENABLED = os.getenv("SAGE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 FIRESTORE_ENABLED = os.getenv("FIRESTORE_ENABLED", "").lower() in {"1", "true", "yes", "on"}
+ALLOWED_FORWARDERS = os.getenv("ALLOWED_FORWARDERS", "")
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -144,6 +145,23 @@ def _enforce_request_size(request: Request) -> None:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"Request too large: {length} bytes (max {limit})",
+        )
+
+
+def _forwarder_whitelist() -> list[str]:
+    if not ALLOWED_FORWARDERS:
+        return []
+    return [addr.strip().lower() for addr in ALLOWED_FORWARDERS.split(",") if addr.strip()]
+
+
+def _enforce_forwarder_whitelist(sender_email: str) -> None:
+    allowed = _forwarder_whitelist()
+    if not allowed:
+        return
+    if sender_email.lower() not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sender not allowed",
         )
 
 
@@ -800,6 +818,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     _log_pdf_text(text)
 
     sender_email = _extract_sender_email(payload) or ""
+    _enforce_forwarder_whitelist(sender_email)
     logger.info(
         "Postmark sender fields: From=%s FromFull.Email=%s OriginalSender=%s",
         payload.get("From"),
