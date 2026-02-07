@@ -29,6 +29,7 @@ from app.parsers.hunts import parse_hunts
 from app.parsers.avogel import parse_avogel
 from app.parsers.watson_pratt import parse_watson_pratt
 from app.parsers.nestle import parse_nestle
+from app.parsers.natures_plus import parse_natures_plus
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
@@ -344,6 +345,15 @@ def _text_looks_like_nestle(text: str) -> bool:
         "nestle uk ltd" in normalized
         and "sales invoice" in normalized
         and "vat reg no" in normalized
+    )
+
+
+def _text_looks_like_natures_plus(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "naturesplus" in normalized
+        or "natures plus" in normalized
+        or "vat reg no: gb718284519" in normalized
     )
 
 
@@ -743,6 +753,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         invoices = [parse_watson_pratt(text)]
     elif _text_looks_like_nestle(text):
         invoices = [parse_nestle(text)]
+    elif _text_looks_like_natures_plus(text):
+        invoices = [parse_natures_plus(text)]
     elif _text_looks_like_avogel(text):
         invoices = [parse_avogel(text)]
     elif is_viridian_sender or _text_looks_like_viridian(text):
