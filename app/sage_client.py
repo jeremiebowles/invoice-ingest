@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import hashlib
 import logging
+import base64
 from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
@@ -14,6 +15,11 @@ from app.models import InvoiceData
 SAGE_TOKEN_URL = "https://oauth.accounting.sage.com/token"
 SAGE_API_BASE = "https://api.accounting.sage.com/v3.1"
 logger = logging.getLogger(__name__)
+
+_ATTACHMENT_CONTEXT_TYPES = {
+    "purchase_invoice": "PURCHASE_INVOICE",
+    "purchase_credit_note": "PURCHASE_CREDIT_NOTE",
+}
 
 
 def _get_env(name: str) -> Optional[str]:
@@ -403,6 +409,50 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
         headers=_sage_headers(access_token, business_id),
         json=payload,
         timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def attach_pdf_to_sage(
+    context_type: str,
+    context_id: str,
+    filename: str,
+    pdf_bytes: bytes,
+) -> Dict[str, Any]:
+    if not pdf_bytes:
+        raise RuntimeError("Missing PDF bytes for attachment")
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+
+    context_type_id = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
+    if not context_type_id:
+        raise RuntimeError(f"Unknown attachment context type: {context_type}")
+
+    access_token = _refresh_access_token()
+    encoded = base64.b64encode(pdf_bytes).decode("utf-8")
+    file_name = filename or "invoice.pdf"
+    if not file_name.lower().endswith(".pdf"):
+        file_name = f"{file_name}.pdf"
+
+    payload = {
+        "attachment": {
+            "file": encoded,
+            "file_name": file_name,
+            "mime_type": "application/pdf",
+            "description": "Uploaded via API",
+            "file_extension": ".pdf",
+            "attachment_context_id": context_id,
+            "attachment_context_type_id": context_type_id,
+        }
+    }
+
+    resp = requests.post(
+        f"{SAGE_API_BASE}/attachments",
+        headers=_sage_headers(access_token, business_id),
+        json=payload,
+        timeout=60,
     )
     resp.raise_for_status()
     return resp.json()

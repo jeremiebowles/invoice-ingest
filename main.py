@@ -43,6 +43,7 @@ from app.sage_client import (
     exchange_auth_code,
     post_purchase_credit_note,
     post_purchase_invoice,
+    attach_pdf_to_sage,
     search_contacts,
     sage_env_hashes,
 )
@@ -856,6 +857,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         logger.info("Sage created id: %s", sage_result.get("id"))
                     elif sage_result.get("status") == "skipped":
                         logger.info("Sage post skipped: %s", sage_result)
+                if isinstance(sage_result, dict) and sage_result.get("id"):
+                    try:
+                        attach_pdf_to_sage(
+                            "purchase_credit_note" if inv.is_credit else "purchase_invoice",
+                            sage_result["id"],
+                            pdf_attachment.get("Name") if pdf_attachment else None,
+                            pdf_bytes,
+                        )
+                        logger.info("Attached PDF to Sage id: %s", sage_result.get("id"))
+                    except Exception as exc:
+                        logger.exception("Failed to attach PDF to Sage: %s", exc)
                 if record_id:
                     if isinstance(sage_result, dict) and sage_result.get("id"):
                         update_record(record_id, {"status": "posted", "sage": sage_result})
