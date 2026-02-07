@@ -25,6 +25,8 @@ from app.firestore_queue import (
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parsers.viridian import parse_viridian
+from app.parsers.hunts import parse_hunts
+from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
 from app.sage_client import (
@@ -297,6 +299,28 @@ def _text_looks_like_viridian(text: str) -> bool:
         or "viridian nutrition" in normalized
         or "viridian-nutrition.com" in normalized
         or "gb738632315" in normalized
+    )
+
+
+def _text_looks_like_hunts(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "hunt’s food group" in normalized
+        or "hunt's food group" in normalized
+        or "hunts food group" in normalized
+        or "hub@huntsfoodgroup.co.uk" in normalized
+        or "vat no: 813 0548 57" in normalized
+    )
+
+
+def _text_looks_like_hunts(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "hunt’s food group" in normalized
+        or "hunt's food group" in normalized
+        or "hunts food group" in normalized
+        or "hub@huntsfoodgroup.co.uk" in normalized
+        or "vat no: 813 0548 57" in normalized
     )
 
 
@@ -660,88 +684,97 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     sender_email = _extract_sender_email(payload) or ""
     is_clf_sender = sender_email.endswith("@clfdistribution.com")
     is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
+    is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
 
-    if is_viridian_sender or _text_looks_like_viridian(text):
+    invoices: list[InvoiceData]
+    if is_hunts_sender or _text_looks_like_hunts(text):
+        if not is_hunts_sender:
+            logger.info("Sender not Hunts domain but PDF looks like Hunts; using Hunts parser: %s", sender_email)
+        invoices = parse_hunts(text)
+    elif is_viridian_sender or _text_looks_like_viridian(text):
         if not is_viridian_sender:
             logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
-        invoice = parse_viridian(text)
+        invoices = [parse_viridian(text)]
     else:
         if not is_clf_sender and _text_looks_like_clf(text):
             is_clf_sender = True
             logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
         if not is_clf_sender:
             logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
-        invoice = parse_clf(text)
-    logger.info("Parsed invoice data: %s", _invoice_to_dict(invoice))
+        invoices = [parse_clf(text)]
 
-    record_id = None
+    parsed_payloads = [_invoice_to_dict(inv) for inv in invoices]
+    logger.info("Parsed invoice data: %s", parsed_payloads)
+
+    record_ids: list[str] = []
     if FIRESTORE_ENABLED:
         try:
-            record_id = enqueue_record(
-                {
-                    "status": "parsed",
-                    "source": "postmark",
-                    "payload_meta": _payload_meta(payload),
-                    "attachment": _attachment_meta(pdf_attachment, len(pdf_bytes)),
-                    "parsed": _serialize_for_storage(_invoice_to_dict(invoice)),
-                }
-            )
-            logger.info("Enqueued Firestore record: %s", record_id)
+            for inv in invoices:
+                record_id = enqueue_record(
+                    {
+                        "status": "parsed",
+                        "source": "postmark",
+                        "payload_meta": _payload_meta(payload),
+                        "attachment": _attachment_meta(pdf_attachment, len(pdf_bytes)),
+                        "parsed": _serialize_for_storage(_invoice_to_dict(inv)),
+                    }
+                )
+                record_ids.append(record_id)
+                logger.info("Enqueued Firestore record: %s", record_id)
         except Exception:
             logger.exception("Failed to write Firestore record")
 
-    sage_result = None
+    sage_results: list[dict[str, Any] | None] = []
     if SAGE_ENABLED:
-        try:
-            if _is_duplicate_post(invoice):
-                duplicate = _duplicate_payload(invoice)
-                sage_result = {
-                    "status": "skipped",
-                    "reason": "duplicate_local",
-                    "number": invoice.supplier_reference,
-                }
-                if record_id:
-                    update_record(
-                        record_id,
-                        {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
-                    )
-                return {
-                    "status": "ok",
-                    "max_request_bytes": _max_request_bytes(),
-                    "parsed": _invoice_to_dict(invoice),
-                    "sage": sage_result,
-                    "record_id": record_id,
-                }
-            if invoice.is_credit:
-                sage_result = post_purchase_credit_note(invoice)
-            else:
-                sage_result = post_purchase_invoice(invoice)
-            if isinstance(sage_result, dict):
-                if sage_result.get("id"):
-                    logger.info("Sage created id: %s", sage_result.get("id"))
-                elif sage_result.get("status") == "skipped":
-                    logger.info("Sage post skipped: %s", sage_result)
-            if record_id:
-                if isinstance(sage_result, dict) and sage_result.get("id"):
-                    update_record(record_id, {"status": "posted", "sage": sage_result})
-                elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
-                    update_record(record_id, {"status": "skipped", "sage": sage_result})
+        for idx, inv in enumerate(invoices):
+            record_id = record_ids[idx] if idx < len(record_ids) else None
+            try:
+                if _is_duplicate_post(inv):
+                    duplicate = _duplicate_payload(inv)
+                    sage_result = {
+                        "status": "skipped",
+                        "reason": "duplicate_local",
+                        "number": inv.supplier_reference,
+                    }
+                    if record_id:
+                        update_record(
+                            record_id,
+                            {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                        )
+                    sage_results.append(sage_result)
+                    continue
+                if inv.is_credit:
+                    sage_result = post_purchase_credit_note(inv)
                 else:
-                    update_record(record_id, {"status": "unknown", "sage": sage_result})
-        except Exception as exc:
-            logger.exception("Sage post failed: %s", exc)
-            sage_result = {"status": "error", "message": str(exc)}
-            if record_id:
-                update_record(record_id, {"status": "error", "error": str(exc)})
+                    sage_result = post_purchase_invoice(inv)
+                if isinstance(sage_result, dict):
+                    if sage_result.get("id"):
+                        logger.info("Sage created id: %s", sage_result.get("id"))
+                    elif sage_result.get("status") == "skipped":
+                        logger.info("Sage post skipped: %s", sage_result)
+                if record_id:
+                    if isinstance(sage_result, dict) and sage_result.get("id"):
+                        update_record(record_id, {"status": "posted", "sage": sage_result})
+                    elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+                        update_record(record_id, {"status": "skipped", "sage": sage_result})
+                    else:
+                        update_record(record_id, {"status": "unknown", "sage": sage_result})
+                sage_results.append(sage_result)
+            except Exception as exc:
+                logger.exception("Sage post failed: %s", exc)
+                sage_result = {"status": "error", "message": str(exc)}
+                if record_id:
+                    update_record(record_id, {"status": "error", "error": str(exc)})
+                sage_results.append(sage_result)
     else:
         logger.info("Sage disabled; skipping post")
-        if record_id:
+        for record_id in record_ids:
             update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
 
     return {
         "status": "ok",
         "max_request_bytes": _max_request_bytes(),
-        "parsed": _invoice_to_dict(invoice),
-        "sage": sage_result,
-        "record_id": record_id,
+        "parsed": parsed_payloads if len(parsed_payloads) > 1 else parsed_payloads[0],
+        "sage": sage_results if len(sage_results) > 1 else (sage_results[0] if sage_results else None),
+        "record_id": record_ids if len(record_ids) > 1 else (record_ids[0] if record_ids else None),
     }
