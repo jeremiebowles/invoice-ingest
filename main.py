@@ -217,20 +217,6 @@ def _enforce_rate_limit(sender_email: str) -> None:
 def _is_duplicate_post(invoice: InvoiceData) -> bool:
     if not FIRESTORE_ENABLED:
         return False
-
-
-def _duplicate_payload(invoice: InvoiceData) -> Dict[str, Any]:
-    invoice_date = (
-        invoice.invoice_date.isoformat()
-        if hasattr(invoice.invoice_date, "isoformat")
-        else str(invoice.invoice_date)
-    )
-    return {
-        "reason": "duplicate_local",
-        "supplier_reference": invoice.supplier_reference,
-        "invoice_date": invoice_date,
-        "is_credit": invoice.is_credit,
-    }
     try:
         invoice_date = (
             invoice.invoice_date.isoformat()
@@ -245,6 +231,20 @@ def _duplicate_payload(invoice: InvoiceData) -> Dict[str, Any]:
     except Exception as exc:
         logger.info("Duplicate check failed, continuing: %s", exc)
         return False
+
+
+def _duplicate_payload(invoice: InvoiceData) -> Dict[str, Any]:
+    invoice_date = (
+        invoice.invoice_date.isoformat()
+        if hasattr(invoice.invoice_date, "isoformat")
+        else str(invoice.invoice_date)
+    )
+    return {
+        "reason": "duplicate_local",
+        "supplier_reference": invoice.supplier_reference,
+        "invoice_date": invoice_date,
+        "is_credit": invoice.is_credit,
+    }
 
 
 def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
@@ -552,23 +552,6 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
         except Exception:
             logger.exception("Failed to reserve message_id; continuing")
 
-    message_id = payload.get("MessageID") or payload.get("MessageId")
-    if FIRESTORE_ENABLED and message_id:
-        try:
-            reserved = reserve_message_id(
-                str(message_id),
-                {"status": "received", "source": "postmark"},
-            )
-            if not reserved:
-                return {
-                    "status": "ok",
-                    "max_request_bytes": _max_request_bytes(),
-                    "message": "Duplicate message_id",
-                    "message_id": message_id,
-                }
-        except Exception:
-            logger.exception("Failed to reserve message_id; continuing")
-
     refresh_token = payload.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh_token")
@@ -649,6 +632,23 @@ async def sage_post(request: Request) -> Dict[str, Any]:
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
+
+    message_id = payload.get("MessageID") or payload.get("MessageId")
+    if FIRESTORE_ENABLED and message_id:
+        try:
+            reserved = reserve_message_id(
+                str(message_id),
+                {"status": "received", "source": "postmark"},
+            )
+            if not reserved:
+                return {
+                    "status": "ok",
+                    "max_request_bytes": _max_request_bytes(),
+                    "message": "Duplicate message_id",
+                    "message_id": message_id,
+                }
+        except Exception:
+            logger.exception("Failed to reserve message_id; continuing")
 
     invoice = _invoice_from_payload(payload)
 
@@ -889,6 +889,23 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     if not isinstance(payload, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
+
+    message_id = payload.get("MessageID") or payload.get("MessageId")
+    if FIRESTORE_ENABLED and message_id:
+        try:
+            reserved = reserve_message_id(
+                str(message_id),
+                {"status": "received", "source": "postmark"},
+            )
+            if not reserved:
+                return {
+                    "status": "ok",
+                    "max_request_bytes": _max_request_bytes(),
+                    "message": "Duplicate message_id",
+                    "message_id": message_id,
+                }
+        except Exception:
+            logger.exception("Failed to reserve message_id; continuing")
 
     pdf_attachment = _find_first_pdf_attachment(payload)
     raw_pdf_attachment = None if pdf_attachment else _extract_pdf_from_raw_email(payload)
