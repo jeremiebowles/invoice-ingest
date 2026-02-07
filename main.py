@@ -36,6 +36,7 @@ from app.sage_client import (
     exchange_auth_code,
     post_purchase_credit_note,
     post_purchase_invoice,
+    search_contacts,
     sage_env_hashes,
 )
 
@@ -388,6 +389,20 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
 async def sage_env_hash(request: Request) -> Dict[str, Any]:
     _check_basic_auth(request)
     return {"hashes": sage_env_hashes()}
+
+
+@app.get("/sage/contacts/search")
+async def sage_contacts_search(request: Request, q: str) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    if not q or not q.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing query")
+    try:
+        return {"status": "ok", **search_contacts(q.strip())}
+    except Exception as exc:
+        logger.exception("Sage contact search failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
 @app.post("/sage/post")

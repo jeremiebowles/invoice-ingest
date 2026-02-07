@@ -406,3 +406,34 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def search_contacts(query: str, limit: int = 20) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+
+    access_token = _refresh_access_token()
+    resp = requests.get(
+        f"{SAGE_API_BASE}/contacts",
+        headers=_sage_headers(access_token, business_id),
+        params={"search": query, "items_per_page": limit},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("$items") or []
+    simplified = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        simplified.append(
+            {
+                "id": item.get("id"),
+                "displayed_as": item.get("displayed_as"),
+                "name": item.get("name"),
+                "reference": item.get("reference"),
+                "email": item.get("email"),
+            }
+        )
+    return {"count": len(simplified), "items": simplified}
