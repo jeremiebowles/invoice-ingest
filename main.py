@@ -800,6 +800,12 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     _log_pdf_text(text)
 
     sender_email = _extract_sender_email(payload) or ""
+    logger.info(
+        "Postmark sender fields: From=%s FromFull.Email=%s OriginalSender=%s",
+        payload.get("From"),
+        (payload.get("FromFull") or {}).get("Email"),
+        payload.get("OriginalSender"),
+    )
     is_clf_sender = sender_email.endswith("@clfdistribution.com")
     is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
     is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
