@@ -78,6 +78,62 @@ def _extract_total(text: str) -> Optional[float]:
     return None
 
 
+def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    lines = [line.strip() for line in (text or "").splitlines()]
+    try:
+        start = next(i for i, line in enumerate(lines) if "vat analysis" in line.lower())
+    except StopIteration:
+        return None, None, None
+
+    section: list[str] = []
+    for line in lines[start + 1 :]:
+        if re.search(r"^Terms:|^Goods Net:|^Delivery:|^Order Net:|^Total:", line, flags=re.IGNORECASE):
+            break
+        if line:
+            section.append(line)
+
+    def _collect_after(label: str) -> list[str]:
+        try:
+            idx = next(i for i, line in enumerate(section) if line.lower() == label.lower())
+        except StopIteration:
+            return []
+        values: list[str] = []
+        for line in section[idx + 1 :]:
+            if re.search(r"^Tax Code$|^VAT %$|^Net \\(£\\)$|^VAT \\(£\\)$", line):
+                break
+            values.append(line)
+        return values
+
+    tax_codes = _collect_after("Tax Code")
+    vat_rates = _collect_after("VAT %")
+    net_values = _collect_after("Net (£)")
+    vat_values = _collect_after("VAT (£)")
+
+    vat_net = 0.0
+    nonvat_net = 0.0
+    vat_amount = 0.0
+
+    for idx, net in enumerate(net_values):
+        net_val = parse_money(net)
+        if net_val is None:
+            continue
+        rate = None
+        if idx < len(vat_rates):
+            rate = parse_money(vat_rates[idx])
+        code = tax_codes[idx] if idx < len(tax_codes) else ""
+        if (rate is not None and rate > 0) or code.upper().startswith("T1"):
+            vat_net += net_val
+        else:
+            nonvat_net += net_val
+
+    for val in vat_values:
+        vat_val = parse_money(val)
+        if vat_val is not None:
+            vat_amount += vat_val
+
+    return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2)
+
+
 def parse_viridian(text: str) -> InvoiceData:
     warnings: list[str] = []
 
@@ -99,10 +155,12 @@ def parse_viridian(text: str) -> InvoiceData:
     terms_days = _extract_terms_days(text or "")
     due_date = invoice_date + timedelta(days=terms_days or 30) if invoice_date else None
 
-    net_values = _extract_money_list(text or "", "Net (£)")
-    vat_values = _extract_money_list(text or "", "VAT (£)")
-    vat_net = round(sum(v for v in net_values if v is not None), 2) if net_values else None
-    vat_amount = round(sum(v for v in vat_values if v is not None), 2) if vat_values else None
+    vat_net, nonvat_net, vat_amount = _extract_vat_analysis(text or "")
+    if vat_net is None or nonvat_net is None or vat_amount is None:
+        net_values = _extract_money_list(text or "", "Net (£)")
+        vat_values = _extract_money_list(text or "", "VAT (£)")
+        vat_net = round(sum(v for v in net_values if v is not None), 2) if net_values else None
+        vat_amount = round(sum(v for v in vat_values if v is not None), 2) if vat_values else None
 
     total = _extract_total(text or "")
     if total is None:
@@ -116,7 +174,8 @@ def parse_viridian(text: str) -> InvoiceData:
         warnings.append("VAT amount not found")
         vat_amount = 0.0
 
-    nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
+    if nonvat_net is None:
+        nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
 
     if not approx_equal(vat_net + nonvat_net + vat_amount, total):
         warnings.append("Totals do not reconcile (net + vat != total)")
