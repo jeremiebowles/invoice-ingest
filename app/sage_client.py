@@ -555,3 +555,45 @@ def search_contacts(query: str, limit: int = 20) -> Dict[str, Any]:
             }
         )
     return {"count": len(simplified), "items": simplified}
+
+
+def _count_endpoint(
+    access_token: str,
+    business_id: str,
+    endpoint: str,
+    date_from: str,
+    date_to: str,
+) -> int:
+    params = {"from_date": date_from, "to_date": date_to, "items_per_page": 1}
+    resp = requests.get(
+        f"{SAGE_API_BASE}/{endpoint}",
+        headers=_sage_headers(access_token, business_id),
+        params=params,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json() if resp.content else {}
+    total = data.get("$total")
+    if isinstance(total, int):
+        return total
+    if isinstance(total, str) and total.isdigit():
+        return int(total)
+    items = data.get("$items") or []
+    return len(items)
+
+
+def count_purchase_invoices(
+    date_from: str, date_to: str, include_credits: bool = False
+) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+
+    access_token = _refresh_access_token()
+    invoices = _count_endpoint(access_token, business_id, "purchase_invoices", date_from, date_to)
+    credits = 0
+    if include_credits:
+        credits = _count_endpoint(
+            access_token, business_id, "purchase_credit_notes", date_from, date_to
+        )
+    return {"invoices": invoices, "credits": credits, "total": invoices + credits}

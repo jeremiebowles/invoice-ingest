@@ -47,6 +47,7 @@ from app.sage_client import (
     attach_pdf_to_sage,
     list_attachments,
     search_contacts,
+    count_purchase_invoices,
     sage_env_hashes,
 )
 
@@ -568,6 +569,35 @@ async def sage_contacts_search(request: Request, q: str) -> Dict[str, Any]:
         return {"status": "ok", **search_contacts(q.strip())}
     except Exception as exc:
         logger.exception("Sage contact search failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@app.get("/sage/purchase-invoices/count")
+async def sage_purchase_invoices_count(
+    request: Request, from_date: str, to_date: str, include_credits: bool = False
+) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    try:
+        date.fromisoformat(from_date)
+        date.fromisoformat(to_date)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="from_date and to_date must be YYYY-MM-DD",
+        ) from exc
+    try:
+        result = count_purchase_invoices(from_date, to_date, include_credits=include_credits)
+        return {
+            "status": "ok",
+            "from_date": from_date,
+            "to_date": to_date,
+            "include_credits": include_credits,
+            **result,
+        }
+    except Exception as exc:
+        logger.exception("Sage invoice count failed: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
