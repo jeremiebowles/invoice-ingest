@@ -27,6 +27,7 @@ from app.parsers.clf import parse_clf
 from app.parsers.viridian import parse_viridian
 from app.parsers.hunts import parse_hunts
 from app.parsers.avogel import parse_avogel
+from app.parsers.watson_pratt import parse_watson_pratt
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
@@ -323,6 +324,16 @@ def _text_looks_like_avogel(text: str) -> bool:
         or "vat no. 454 9330 37" in normalized
         or "vat no: 454 9330 37" in normalized
         or "sales i n voice" in normalized
+    )
+
+
+def _text_looks_like_watson_pratt(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "tax invoice" in normalized
+        and "invoice number" in normalized
+        and "amount gbp" in normalized
+        and "vat number 125201466" in normalized
     )
 
 
@@ -718,6 +729,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         if not is_hunts_sender:
             logger.info("Sender not Hunts domain but PDF looks like Hunts; using Hunts parser: %s", sender_email)
         invoices = parse_hunts(text)
+    elif _text_looks_like_watson_pratt(text):
+        invoices = [parse_watson_pratt(text)]
     elif _text_looks_like_avogel(text):
         invoices = [parse_avogel(text)]
     elif is_viridian_sender or _text_looks_like_viridian(text):
