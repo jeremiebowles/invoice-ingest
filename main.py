@@ -53,6 +53,8 @@ from app.sage_client import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("invoice-ingest")
 
+APP_VERSION = os.getenv("APP_VERSION", "1a22127")
+
 app = FastAPI()
 
 
@@ -63,6 +65,7 @@ async def version() -> Dict[str, Any]:
         "revision": os.getenv("K_REVISION"),
         "service": os.getenv("K_SERVICE"),
         "commit": os.getenv("COMMIT_SHA") or os.getenv("REVISION_ID"),
+        "app_version": APP_VERSION,
     }
 
 
