@@ -20,8 +20,10 @@ from app.firestore_queue import (
     has_recent_posted_match,
     increment_rate_limit,
     list_records,
+    reserve_message_id,
     test_roundtrip,
     update_record,
+    update_message_status,
 )
 from app.models import InvoiceData
 from app.parsers.clf import parse_clf
@@ -80,6 +82,7 @@ FIRESTORE_ENABLED = os.getenv("FIRESTORE_ENABLED", "").lower() in {"1", "true", 
 ALLOWED_FORWARDERS = os.getenv("ALLOWED_FORWARDERS", "")
 BLOCKLIST_KEYWORDS = os.getenv("BLOCKLIST_KEYWORDS", "")
 RATE_LIMIT_PER_DAY = os.getenv("RATE_LIMIT_PER_DAY", "20")
+REQUIRE_SES_SOURCE = os.getenv("REQUIRE_SES_SOURCE", "").lower() in {"1", "true", "yes", "on"}
 
 
 def _max_request_bytes() -> Optional[int]:
@@ -532,6 +535,23 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="JSON payload must be an object")
 
+    message_id = payload.get("MessageID") or payload.get("MessageId")
+    if FIRESTORE_ENABLED and message_id:
+        try:
+            reserved = reserve_message_id(
+                str(message_id),
+                {"status": "received", "source": "postmark"},
+            )
+            if not reserved:
+                return {
+                    "status": "ok",
+                    "max_request_bytes": _max_request_bytes(),
+                    "message": "Duplicate message_id",
+                    "message_id": message_id,
+                }
+        except Exception:
+            logger.exception("Failed to reserve message_id; continuing")
+
     refresh_token = payload.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh_token")
@@ -840,6 +860,10 @@ async def sage_exchange(request: Request) -> Dict[str, Any]:
 async def postmark_inbound(request: Request) -> Dict[str, Any]:
     _check_basic_auth(request)
     _enforce_request_size(request)
+    if REQUIRE_SES_SOURCE:
+        source = (request.headers.get("x-source") or "").strip().lower()
+        if source != "ses":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid source")
 
     try:
         payload = await request.json()
@@ -1017,6 +1041,22 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         logger.info("Sage disabled; skipping post")
         for record_id in record_ids:
             update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+
+    if FIRESTORE_ENABLED and message_id:
+        try:
+            status = "parsed"
+            if SAGE_ENABLED and sage_results:
+                if any(isinstance(r, dict) and r.get("status") == "error" for r in sage_results):
+                    status = "error"
+                elif any(isinstance(r, dict) and r.get("status") == "skipped" for r in sage_results) and not any(
+                    isinstance(r, dict) and r.get("id") for r in sage_results
+                ):
+                    status = "skipped"
+                elif any(isinstance(r, dict) and r.get("id") for r in sage_results):
+                    status = "posted"
+            update_message_status(str(message_id), {"status": status, "record_id": record_ids})
+        except Exception:
+            logger.exception("Failed to update message_id status")
 
     return {
         "status": "ok",

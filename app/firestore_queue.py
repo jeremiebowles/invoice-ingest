@@ -4,6 +4,7 @@ import os
 from typing import Any, Dict, Optional
 
 from google.cloud import firestore
+from google.api_core.exceptions import AlreadyExists
 
 
 def _get_env(name: str) -> Optional[str]:
@@ -21,6 +22,17 @@ def _get_collection():
     database = _get_database()
     client = firestore.Client(database=database)
     return client.collection(collection)
+
+
+def _get_message_collection():
+    collection = _get_env("FIRESTORE_MESSAGE_COLLECTION") or "processed_messages"
+    database = _get_database()
+    client = firestore.Client(database=database)
+    return client.collection(collection)
+
+
+def _normalize_message_id(message_id: str) -> str:
+    return message_id.strip().replace("/", "_")
 
 
 def enqueue_record(record: Dict[str, Any]) -> str:
@@ -130,3 +142,28 @@ def increment_rate_limit(key: str, limit: int) -> int:
     if limit > 0 and count > limit:
         return count
     return count
+
+
+def reserve_message_id(message_id: str, data: Optional[Dict[str, Any]] = None) -> bool:
+    if not message_id:
+        return False
+    col = _get_message_collection()
+    doc_id = _normalize_message_id(message_id)
+    payload = dict(data or {})
+    payload.setdefault("created_at", firestore.SERVER_TIMESTAMP)
+    payload.setdefault("updated_at", firestore.SERVER_TIMESTAMP)
+    try:
+        col.document(doc_id).create(payload)
+        return True
+    except AlreadyExists:
+        return False
+
+
+def update_message_status(message_id: str, fields: Dict[str, Any]) -> None:
+    if not message_id:
+        return
+    col = _get_message_collection()
+    doc_id = _normalize_message_id(message_id)
+    payload = dict(fields)
+    payload["updated_at"] = firestore.SERVER_TIMESTAMP
+    col.document(doc_id).set(payload, merge=True)
