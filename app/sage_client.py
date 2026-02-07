@@ -20,6 +20,7 @@ _ATTACHMENT_CONTEXT_TYPES = {
     "purchase_invoice": "PURCHASE_INVOICE",
     "purchase_credit_note": "PURCHASE_CREDIT_NOTE",
 }
+_ATTACHMENT_CONTEXT_TYPE_IDS: dict[str, str] = {}
 
 
 def _get_env(name: str) -> Optional[str]:
@@ -426,11 +427,12 @@ def attach_pdf_to_sage(
     if not business_id:
         raise RuntimeError("Missing Sage business configuration")
 
-    context_type_id = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
-    if not context_type_id:
+    context_type_name = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
+    if not context_type_name:
         raise RuntimeError(f"Unknown attachment context type: {context_type}")
 
     access_token = _refresh_access_token()
+    context_type_id = _get_attachment_context_type_id(access_token, business_id, context_type_name)
     encoded = base64.b64encode(pdf_bytes).decode("utf-8")
     file_name = filename or "invoice.pdf"
     if not file_name.lower().endswith(".pdf"):
@@ -462,11 +464,12 @@ def list_attachments(context_type: str, context_id: str, limit: int = 20) -> Dic
     business_id = _get_env("SAGE_BUSINESS_ID")
     if not business_id:
         raise RuntimeError("Missing Sage business configuration")
-    context_type_id = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
-    if not context_type_id:
+    context_type_name = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
+    if not context_type_name:
         raise RuntimeError(f"Unknown attachment context type: {context_type}")
 
     access_token = _refresh_access_token()
+    context_type_id = _get_attachment_context_type_id(access_token, business_id, context_type_name)
     resp = requests.get(
         f"{SAGE_API_BASE}/attachments",
         headers=_sage_headers(access_token, business_id),
@@ -479,6 +482,31 @@ def list_attachments(context_type: str, context_id: str, limit: int = 20) -> Dic
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def _get_attachment_context_type_id(
+    access_token: str, business_id: str, context_type_name: str
+) -> str:
+    cached = _ATTACHMENT_CONTEXT_TYPE_IDS.get(context_type_name)
+    if cached:
+        return cached
+    resp = requests.get(
+        f"{SAGE_API_BASE}/attachment_context_types",
+        headers=_sage_headers(access_token, business_id),
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    items = data.get("$items") or []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if item.get("id") == context_type_name or item.get("displayed_as") == context_type_name:
+            ctx_id = item.get("id")
+            if ctx_id:
+                _ATTACHMENT_CONTEXT_TYPE_IDS[context_type_name] = ctx_id
+                return ctx_id
+    raise RuntimeError(f"Attachment context type not found: {context_type_name}")
 
 
 def search_contacts(query: str, limit: int = 20) -> Dict[str, Any]:
