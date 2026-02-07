@@ -44,6 +44,7 @@ from app.sage_client import (
     post_purchase_credit_note,
     post_purchase_invoice,
     attach_pdf_to_sage,
+    list_attachments,
     search_contacts,
     sage_env_hashes,
 )
@@ -467,6 +468,19 @@ async def sage_env_hash(request: Request) -> Dict[str, Any]:
     return {"hashes": sage_env_hashes()}
 
 
+@app.get("/sage/attachments")
+async def sage_attachments(request: Request, context_type: str, context_id: str) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    try:
+        data = list_attachments(context_type, context_id)
+        return {"status": "ok", "attachments": data}
+    except Exception as exc:
+        logger.exception("Sage attachment list failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
 @app.get("/sage/contacts/search")
 async def sage_contacts_search(request: Request, q: str) -> Dict[str, Any]:
     _check_basic_auth(request)
@@ -859,15 +873,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         logger.info("Sage post skipped: %s", sage_result)
                 if isinstance(sage_result, dict) and sage_result.get("id"):
                     try:
-                        attach_pdf_to_sage(
+                        attachment_result = attach_pdf_to_sage(
                             "purchase_credit_note" if inv.is_credit else "purchase_invoice",
                             sage_result["id"],
                             pdf_attachment.get("Name") if pdf_attachment else None,
                             pdf_bytes,
                         )
                         logger.info("Attached PDF to Sage id: %s", sage_result.get("id"))
+                        sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
                     except Exception as exc:
                         logger.exception("Failed to attach PDF to Sage: %s", exc)
+                        sage_result["attachment"] = {"status": "error", "message": str(exc)}
                 if record_id:
                     if isinstance(sage_result, dict) and sage_result.get("id"):
                         update_record(record_id, {"status": "posted", "sage": sage_result})

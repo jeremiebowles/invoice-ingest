@@ -458,6 +458,29 @@ def attach_pdf_to_sage(
     return resp.json()
 
 
+def list_attachments(context_type: str, context_id: str, limit: int = 20) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+    context_type_id = _ATTACHMENT_CONTEXT_TYPES.get(context_type)
+    if not context_type_id:
+        raise RuntimeError(f"Unknown attachment context type: {context_type}")
+
+    access_token = _refresh_access_token()
+    resp = requests.get(
+        f"{SAGE_API_BASE}/attachments",
+        headers=_sage_headers(access_token, business_id),
+        params={
+            "attachment_context_id": context_id,
+            "attachment_context_type_id": context_type_id,
+            "items_per_page": limit,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def search_contacts(query: str, limit: int = 20) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
     if not business_id:
