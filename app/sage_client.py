@@ -250,6 +250,23 @@ def _sage_headers(access_token: str, business_id: str) -> Dict[str, str]:
     }
 
 
+def _raise_for_status_with_body(resp: requests.Response, context: str) -> None:
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        body_text = resp.text or ""
+        snippet = body_text[:1000]
+        logger.error("%s failed: HTTP %s", context, resp.status_code)
+        if snippet:
+            logger.error("%s response body: %s", context, snippet)
+        try:
+            data = resp.json()
+            logger.error("%s response json: %s", context, data)
+        except Exception:
+            pass
+        raise RuntimeError(f"{context} failed: HTTP {resp.status_code} {snippet}") from exc
+
+
 def _already_exists(
     access_token: str,
     business_id: str,
@@ -377,7 +394,7 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
         json=payload,
         timeout=30,
     )
-    resp.raise_for_status()
+    _raise_for_status_with_body(resp, "Sage purchase invoice")
     return resp.json()
 
 
@@ -428,7 +445,7 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
         json=payload,
         timeout=30,
     )
-    resp.raise_for_status()
+    _raise_for_status_with_body(resp, "Sage purchase credit note")
     return resp.json()
 
 
