@@ -348,6 +348,15 @@ def parse_clf(text: str) -> InvoiceData:
             vat_net = 0.0
             nonvat_net = total_excl_vat
 
+    if (
+        total_excl_vat is not None
+        and total_incl_vat is not None
+        and vat_amount is not None
+        and not approx_equal(vat_amount, total_incl_vat - total_excl_vat)
+    ):
+        vat_amount = round(total_incl_vat - total_excl_vat, 2)
+        warnings.append("VAT amount overridden from totals")
+
     if vat_net is None or nonvat_net is None or vat_amount is None:
         (
             vat_net_from_breakdown,
