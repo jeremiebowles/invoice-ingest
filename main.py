@@ -21,6 +21,7 @@ from app.firestore_queue import (
     increment_rate_limit,
     list_records,
     find_records_by_reference,
+    reserve_reference,
     reserve_message_id,
     test_roundtrip,
     update_record,
@@ -765,7 +766,10 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
 
 @app.post("/sage/post-by-reference")
 async def sage_post_by_reference(
-    request: Request, supplier_reference: str, invoice_date: Optional[str] = None
+    request: Request,
+    supplier_reference: str,
+    invoice_date: Optional[str] = None,
+    force: bool = False,
 ) -> Dict[str, Any]:
     _check_basic_auth(request)
 
@@ -807,6 +811,18 @@ async def sage_post_by_reference(
         return {"status": "disabled", "record_id": record_id}
 
     try:
+        if not force and FIRESTORE_ENABLED:
+            ref_date = (
+                invoice.invoice_date.isoformat()
+                if hasattr(invoice.invoice_date, "isoformat")
+                else str(invoice.invoice_date)
+            )
+            reserved = reserve_reference(invoice.supplier_reference, ref_date, invoice.is_credit)
+            if not reserved:
+                duplicate = _duplicate_payload(invoice)
+                skip = {"status": "skipped", "reason": "reference_locked", "number": invoice.supplier_reference}
+                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                return {"status": "ok", "sage": skip, "record_id": record_id}
         if _is_duplicate_post(invoice):
             duplicate = _duplicate_payload(invoice)
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
@@ -1101,6 +1117,27 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         for idx, inv in enumerate(invoices):
             record_id = record_ids[idx] if idx < len(record_ids) else None
             try:
+                if FIRESTORE_ENABLED:
+                    ref_date = (
+                        inv.invoice_date.isoformat()
+                        if hasattr(inv.invoice_date, "isoformat")
+                        else str(inv.invoice_date)
+                    )
+                    reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
+                    if not reserved:
+                        duplicate = _duplicate_payload(inv)
+                        sage_result = {
+                            "status": "skipped",
+                            "reason": "reference_locked",
+                            "number": inv.supplier_reference,
+                        }
+                        if record_id:
+                            update_record(
+                                record_id,
+                                {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                            )
+                        sage_results.append(sage_result)
+                        continue
                 if _is_duplicate_post(inv):
                     duplicate = _duplicate_payload(inv)
                     sage_result = {

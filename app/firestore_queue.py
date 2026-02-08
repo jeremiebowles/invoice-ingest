@@ -178,3 +178,31 @@ def update_message_status(message_id: str, fields: Dict[str, Any]) -> None:
     payload = dict(fields)
     payload["updated_at"] = firestore.SERVER_TIMESTAMP
     col.document(doc_id).set(payload, merge=True)
+
+
+def reserve_reference(
+    supplier_reference: str, invoice_date: Optional[str], is_credit: Optional[bool]
+) -> bool:
+    if not supplier_reference:
+        return False
+    key_parts = [supplier_reference.strip().upper()]
+    if invoice_date:
+        key_parts.append(str(invoice_date))
+    if is_credit is not None:
+        key_parts.append("credit" if is_credit else "invoice")
+    doc_id = "_".join(key_parts).replace("/", "_")
+    database = _get_database()
+    client = firestore.Client(database=database)
+    col = client.collection(_get_env("FIRESTORE_REFERENCE_COLLECTION") or "reference_locks")
+    payload = {
+        "supplier_reference": supplier_reference,
+        "invoice_date": invoice_date,
+        "is_credit": is_credit,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    try:
+        col.document(doc_id).create(payload)
+        return True
+    except AlreadyExists:
+        return False
