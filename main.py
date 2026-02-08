@@ -226,24 +226,34 @@ def _is_duplicate_post(invoice: InvoiceData) -> bool:
             if hasattr(invoice.invoice_date, "isoformat")
             else str(invoice.invoice_date)
         )
-        return has_recent_posted_match(
+        is_dup = has_recent_posted_match(
             invoice.supplier_reference,
             invoice_date,
             invoice.is_credit,
         )
+        if is_dup:
+            logger.info(
+                "Duplicate local match",
+                extra={
+                    "supplier_reference": invoice.supplier_reference,
+                    "invoice_date": invoice_date,
+                    "is_credit": invoice.is_credit,
+                },
+            )
+        return is_dup
     except Exception as exc:
         logger.info("Duplicate check failed, continuing: %s", exc)
         return False
 
 
-def _duplicate_payload(invoice: InvoiceData) -> Dict[str, Any]:
+def _duplicate_payload(invoice: InvoiceData, reason: str) -> Dict[str, Any]:
     invoice_date = (
         invoice.invoice_date.isoformat()
         if hasattr(invoice.invoice_date, "isoformat")
         else str(invoice.invoice_date)
     )
     return {
-        "reason": "duplicate_local",
+        "reason": reason,
         "supplier_reference": invoice.supplier_reference,
         "invoice_date": invoice_date,
         "is_credit": invoice.is_credit,
@@ -546,6 +556,10 @@ async def sage_test_refresh_token(request: Request) -> Dict[str, Any]:
                 {"status": "received", "source": "postmark"},
             )
             if not reserved:
+                logger.info(
+                    "Duplicate message_id detected",
+                    extra={"message_id": message_id, "source": "postmark"},
+                )
                 return {
                     "status": "ok",
                     "max_request_bytes": _max_request_bytes(),
@@ -658,6 +672,10 @@ async def sage_post(request: Request) -> Dict[str, Any]:
                 {"status": "received", "source": "postmark"},
             )
             if not reserved:
+                logger.info(
+                    "Duplicate message_id detected",
+                    extra={"message_id": message_id, "source": "postmark"},
+                )
                 return {
                     "status": "ok",
                     "max_request_bytes": _max_request_bytes(),
@@ -691,7 +709,7 @@ async def sage_post(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
-            duplicate = _duplicate_payload(invoice)
+            duplicate = _duplicate_payload(invoice, "duplicate_local")
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
             if record_id:
                 update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
@@ -745,7 +763,7 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
-            duplicate = _duplicate_payload(invoice)
+            duplicate = _duplicate_payload(invoice, "duplicate_local")
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
             update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
             return {"status": "ok", "sage": skip, "record_id": record_id}
@@ -834,12 +852,20 @@ async def sage_post_by_reference(
             )
             reserved = reserve_reference(invoice.supplier_reference, ref_date, invoice.is_credit)
             if not reserved:
-                duplicate = _duplicate_payload(invoice)
+                logger.info(
+                    "Duplicate reference lock detected",
+                    extra={
+                        "supplier_reference": invoice.supplier_reference,
+                        "invoice_date": ref_date,
+                        "is_credit": invoice.is_credit,
+                    },
+                )
+                duplicate = _duplicate_payload(invoice, "reference_locked")
                 skip = {"status": "skipped", "reason": "reference_locked", "number": invoice.supplier_reference}
                 update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
                 return {"status": "ok", "sage": skip, "record_id": record_id}
         if _is_duplicate_post(invoice):
-            duplicate = _duplicate_payload(invoice)
+            duplicate = _duplicate_payload(invoice, "duplicate_local")
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
             update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
             return {"status": "ok", "sage": skip, "record_id": record_id}
@@ -1009,6 +1035,10 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                 {"status": "received", "source": "postmark"},
             )
             if not reserved:
+                logger.info(
+                    "Duplicate message_id detected",
+                    extra={"message_id": message_id, "source": "postmark"},
+                )
                 return {
                     "status": "ok",
                     "max_request_bytes": _max_request_bytes(),
@@ -1140,7 +1170,15 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                     )
                     reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
                     if not reserved:
-                        duplicate = _duplicate_payload(inv)
+                        logger.info(
+                            "Duplicate reference lock detected",
+                            extra={
+                                "supplier_reference": inv.supplier_reference,
+                                "invoice_date": ref_date,
+                                "is_credit": inv.is_credit,
+                            },
+                        )
+                        duplicate = _duplicate_payload(inv, "reference_locked")
                         sage_result = {
                             "status": "skipped",
                             "reason": "reference_locked",
@@ -1154,7 +1192,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         sage_results.append(sage_result)
                         continue
                 if _is_duplicate_post(inv):
-                    duplicate = _duplicate_payload(inv)
+                    duplicate = _duplicate_payload(inv, "duplicate_local")
                     sage_result = {
                         "status": "skipped",
                         "reason": "duplicate_local",
