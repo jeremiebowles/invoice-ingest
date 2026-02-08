@@ -53,6 +53,7 @@ from app.sage_client import (
     list_attachments,
     search_contacts,
     search_purchase_credit_notes,
+    sage_invoice_exists,
     count_purchase_invoices,
     sage_env_hashes,
 )
@@ -259,6 +260,16 @@ def _duplicate_payload(invoice: InvoiceData, reason: str) -> Dict[str, Any]:
         "invoice_date": invoice_date,
         "is_credit": invoice.is_credit,
     }
+
+
+def _sage_duplicate_exists(invoice: InvoiceData) -> Optional[bool]:
+    if not SAGE_ENABLED:
+        return None
+    try:
+        return sage_invoice_exists(invoice)
+    except Exception as exc:
+        logger.info("Sage duplicate lookup failed; keeping local decision: %s", exc)
+        return None
 
 
 def _invoice_to_dict(invoice: Any) -> Dict[str, Any]:
@@ -752,11 +763,19 @@ async def sage_post(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
-            duplicate = _duplicate_payload(invoice, "duplicate_local")
-            skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
-            if record_id:
-                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
-            return {"status": "ok", "sage": skip, "record_id": record_id}
+            sage_exists = _sage_duplicate_exists(invoice)
+            if sage_exists is True:
+                duplicate = _duplicate_payload(invoice, "duplicate_sage")
+                skip = {"status": "skipped", "reason": "duplicate_sage", "number": invoice.supplier_reference}
+                if record_id:
+                    update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                return {"status": "ok", "sage": skip, "record_id": record_id}
+            if sage_exists is None:
+                duplicate = _duplicate_payload(invoice, "duplicate_local")
+                skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
+                if record_id:
+                    update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
         else:
@@ -806,10 +825,17 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
 
     try:
         if _is_duplicate_post(invoice):
-            duplicate = _duplicate_payload(invoice, "duplicate_local")
-            skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
-            update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
-            return {"status": "ok", "sage": skip, "record_id": record_id}
+            sage_exists = _sage_duplicate_exists(invoice)
+            if sage_exists is True:
+                duplicate = _duplicate_payload(invoice, "duplicate_sage")
+                skip = {"status": "skipped", "reason": "duplicate_sage", "number": invoice.supplier_reference}
+                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                return {"status": "ok", "sage": skip, "record_id": record_id}
+            if sage_exists is None:
+                duplicate = _duplicate_payload(invoice, "duplicate_local")
+                skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
+                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
             sage_result = post_purchase_credit_note(invoice)
         else:
@@ -903,10 +929,21 @@ async def sage_post_by_reference(
                         "is_credit": invoice.is_credit,
                     },
                 )
-                duplicate = _duplicate_payload(invoice, "reference_locked")
-                skip = {"status": "skipped", "reason": "reference_locked", "number": invoice.supplier_reference}
-                update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
-                return {"status": "ok", "sage": skip, "record_id": record_id}
+                sage_exists = _sage_duplicate_exists(invoice)
+                if sage_exists is True:
+                    duplicate = _duplicate_payload(invoice, "duplicate_sage")
+                    skip = {"status": "skipped", "reason": "duplicate_sage", "number": invoice.supplier_reference}
+                    update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                    return {"status": "ok", "sage": skip, "record_id": record_id}
+                if sage_exists is None:
+                    duplicate = _duplicate_payload(invoice, "reference_locked")
+                    skip = {
+                        "status": "skipped",
+                        "reason": "reference_locked",
+                        "number": invoice.supplier_reference,
+                    }
+                    update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+                    return {"status": "ok", "sage": skip, "record_id": record_id}
         if _is_duplicate_post(invoice):
             duplicate = _duplicate_payload(invoice, "duplicate_local")
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
@@ -1221,10 +1258,42 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                                 "is_credit": inv.is_credit,
                             },
                         )
-                        duplicate = _duplicate_payload(inv, "reference_locked")
+                        sage_exists = _sage_duplicate_exists(inv)
+                        if sage_exists is True:
+                            duplicate = _duplicate_payload(inv, "duplicate_sage")
+                            sage_result = {
+                                "status": "skipped",
+                                "reason": "duplicate_sage",
+                                "number": inv.supplier_reference,
+                            }
+                            if record_id:
+                                update_record(
+                                    record_id,
+                                    {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                                )
+                            sage_results.append(sage_result)
+                            continue
+                        if sage_exists is None:
+                            duplicate = _duplicate_payload(inv, "reference_locked")
+                            sage_result = {
+                                "status": "skipped",
+                                "reason": "reference_locked",
+                                "number": inv.supplier_reference,
+                            }
+                            if record_id:
+                                update_record(
+                                    record_id,
+                                    {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                                )
+                            sage_results.append(sage_result)
+                            continue
+                if _is_duplicate_post(inv):
+                    sage_exists = _sage_duplicate_exists(inv)
+                    if sage_exists is True:
+                        duplicate = _duplicate_payload(inv, "duplicate_sage")
                         sage_result = {
                             "status": "skipped",
-                            "reason": "reference_locked",
+                            "reason": "duplicate_sage",
                             "number": inv.supplier_reference,
                         }
                         if record_id:
@@ -1234,20 +1303,20 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                             )
                         sage_results.append(sage_result)
                         continue
-                if _is_duplicate_post(inv):
-                    duplicate = _duplicate_payload(inv, "duplicate_local")
-                    sage_result = {
-                        "status": "skipped",
-                        "reason": "duplicate_local",
-                        "number": inv.supplier_reference,
-                    }
-                    if record_id:
-                        update_record(
-                            record_id,
-                            {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
-                        )
-                    sage_results.append(sage_result)
-                    continue
+                    if sage_exists is None:
+                        duplicate = _duplicate_payload(inv, "duplicate_local")
+                        sage_result = {
+                            "status": "skipped",
+                            "reason": "duplicate_local",
+                            "number": inv.supplier_reference,
+                        }
+                        if record_id:
+                            update_record(
+                                record_id,
+                                {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                            )
+                        sage_results.append(sage_result)
+                        continue
                 if inv.is_credit:
                     sage_result = post_purchase_credit_note(inv)
                 else:

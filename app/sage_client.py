@@ -449,6 +449,32 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
     return resp.json()
 
 
+def sage_invoice_exists(invoice: InvoiceData) -> bool:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    contact_id = _get_env("SAGE_CONTACT_ID")
+    if not business_id or not contact_id:
+        raise RuntimeError("Missing Sage business/contact configuration")
+
+    access_token = _refresh_access_token()
+    if invoice.is_credit:
+        return _already_exists(
+            access_token,
+            business_id,
+            "purchase_credit_notes",
+            invoice.supplier_reference,
+            "credit_note_number",
+            contact_id,
+        )
+    return _already_exists(
+        access_token,
+        business_id,
+        "purchase_invoices",
+        invoice.supplier_reference,
+        "invoice_number",
+        contact_id,
+    )
+
+
 def attach_pdf_to_sage(
     context_type: str,
     context_id: str,
