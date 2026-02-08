@@ -51,6 +51,7 @@ from app.sage_client import (
     attach_pdf_to_sage,
     list_attachments,
     search_contacts,
+    search_purchase_credit_notes,
     count_purchase_invoices,
     sage_env_hashes,
 )
@@ -591,6 +592,20 @@ async def sage_contacts_search(request: Request, q: str) -> Dict[str, Any]:
         return {"status": "ok", **search_contacts(q.strip())}
     except Exception as exc:
         logger.exception("Sage contact search failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@app.get("/sage/credit-notes/search")
+async def sage_credit_notes_search(request: Request, q: str) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    if not q or not q.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing query")
+    try:
+        return {"status": "ok", **search_purchase_credit_notes(q.strip())}
+    except Exception as exc:
+        logger.exception("Sage credit note search failed: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
 

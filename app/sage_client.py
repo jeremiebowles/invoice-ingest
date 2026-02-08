@@ -574,6 +574,38 @@ def search_contacts(query: str, limit: int = 20) -> Dict[str, Any]:
     return {"count": len(simplified), "items": simplified}
 
 
+def search_purchase_credit_notes(query: str, limit: int = 20) -> Dict[str, Any]:
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+
+    access_token = _refresh_access_token()
+    resp = requests.get(
+        f"{SAGE_API_BASE}/purchase_credit_notes",
+        headers=_sage_headers(access_token, business_id),
+        params={"search": query, "items_per_page": limit},
+        timeout=30,
+    )
+    _raise_for_status_with_body(resp, "Sage credit note search")
+    data = resp.json() if resp.content else {}
+    items = data.get("$items") or []
+    simplified = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        simplified.append(
+            {
+                "id": item.get("id"),
+                "displayed_as": item.get("displayed_as"),
+                "reference": item.get("reference"),
+                "vendor_reference": item.get("vendor_reference"),
+                "date": item.get("date"),
+                "total_amount": item.get("total_amount"),
+            }
+        )
+    return {"count": len(simplified), "items": simplified}
+
+
 def _count_endpoint(
     access_token: str,
     business_id: str,
