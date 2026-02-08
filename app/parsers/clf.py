@@ -271,12 +271,15 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
                 values = _extract_money_values(line)
                 if values:
                     numeric_lines.append(values[0])
-        if len(numeric_lines) >= 1 and total_excl is None:
+        if len(numeric_lines) >= 3:
             total_excl = numeric_lines[0]
-        if len(numeric_lines) >= 2 and vat_amount is None:
             vat_amount = numeric_lines[1]
-        if len(numeric_lines) >= 3 and total_incl is None:
             total_incl = numeric_lines[2]
+        elif len(numeric_lines) >= 2:
+            total_excl = numeric_lines[0]
+            vat_amount = numeric_lines[1]
+        elif len(numeric_lines) >= 1:
+            total_excl = numeric_lines[0]
 
     if vat_amount is None and total_excl is not None and total_incl is not None:
         vat_amount = round(total_incl - total_excl, 2)
