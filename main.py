@@ -57,7 +57,7 @@ from app.sage_client import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("invoice-ingest")
 
-APP_VERSION = os.getenv("APP_VERSION", "1a22127")
+APP_VERSION = os.getenv("APP_VERSION", "1bc2f0e")
 
 app = FastAPI()
 
