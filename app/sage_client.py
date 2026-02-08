@@ -277,6 +277,18 @@ def _already_exists(
 ) -> bool:
     if not number or number == "UNKNOWN":
         return False
+    target = str(number).strip().upper()
+
+    def _norm(value: Any) -> str:
+        return str(value).strip().upper()
+
+    def _matches(item: Dict[str, Any]) -> bool:
+        for key in (number_field, "reference", "vendor_reference", "displayed_as"):
+            value = item.get(key)
+            if value and _norm(value) == target:
+                return True
+        return False
+
     contact_filter = f" and contact_id eq '{contact_id}'" if contact_id else ""
     candidates = [
         {"search": number, "items_per_page": 50},
@@ -310,17 +322,30 @@ def _already_exists(
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                if item.get(number_field) == number:
-                    return True
-                if item.get("reference") == number:
-                    return True
-                if item.get("vendor_reference") == number:
+                if _matches(item):
+                    logger.info(
+                        "Sage duplicate match on %s for %s",
+                        endpoint,
+                        number,
+                        extra={"params": params, "id": item.get("id")},
+                    )
                     return True
                 if contact_id and item.get("contact", {}).get("id") == contact_id:
-                    if item.get("vendor_reference") == number:
+                    if _matches(item):
+                        logger.info(
+                            "Sage duplicate match on %s for %s (contact)",
+                            endpoint,
+                            number,
+                            extra={"params": params, "id": item.get("id")},
+                        )
                         return True
-                    if item.get("reference") == number:
-                        return True
+            if items:
+                logger.info(
+                    "Sage duplicate candidate(s) returned for %s on %s",
+                    number,
+                    endpoint,
+                    extra={"params": params, "count": len(items)},
+                )
         except Exception as exc:
             logger.info("Sage duplicate check failed for %s: %s", params, exc)
             continue
@@ -338,9 +363,12 @@ def _already_exists(
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                if item.get("reference") == number:
-                    return True
-                if item.get("displayed_as") == number:
+                if _matches(item):
+                    logger.info(
+                        "Sage duplicate match on transactions for %s",
+                        number,
+                        extra={"id": item.get("id")},
+                    )
                     return True
     except Exception as exc:
         logger.info("Sage duplicate check failed for transactions: %s", exc)
