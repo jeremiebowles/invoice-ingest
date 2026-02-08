@@ -435,7 +435,7 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
             "net_amount": net_amount,
             "tax_amount": vat_amount,
             "total_amount": total_amount,
-            "invoice_lines": invoice_lines,
+            "credit_note_lines": invoice_lines,
         }
     }
 
