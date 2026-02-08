@@ -243,16 +243,40 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
                 return values[0] if values else None
         return None
 
+    excl_idx = None
+    vat_idx = None
+    incl_idx = None
+
     for idx, line in enumerate(lines):
         if total_incl is None and re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
             total_incl = _next_numeric_value(idx)
+            incl_idx = idx
             continue
         if vat_amount is None and re.search(r"(VAT\s*Amount|\d{1,2}%\s*VAT)", line, flags=re.IGNORECASE):
             vat_amount = _next_numeric_value(idx)
+            vat_idx = idx
             continue
         if total_excl is None and re.search(r"Total\s*GBP\s*Excl\.?\s*VAT", line, flags=re.IGNORECASE):
             total_excl = _next_numeric_value(idx)
+            excl_idx = idx
             continue
+
+    # If totals are listed as a block of labels followed by numeric lines, map in order.
+    label_indices = [i for i in (excl_idx, vat_idx, incl_idx) if i is not None]
+    if label_indices:
+        start = max(label_indices) + 1
+        numeric_lines: list[float] = []
+        for line in lines[start : start + 8]:
+            if _MONEY_ONLY_RE.match(line):
+                values = _extract_money_values(line)
+                if values:
+                    numeric_lines.append(values[0])
+        if len(numeric_lines) >= 1 and total_excl is None:
+            total_excl = numeric_lines[0]
+        if len(numeric_lines) >= 2 and vat_amount is None:
+            vat_amount = numeric_lines[1]
+        if len(numeric_lines) >= 3 and total_incl is None:
+            total_incl = numeric_lines[2]
 
     if vat_amount is None and total_excl is not None and total_incl is not None:
         vat_amount = round(total_incl - total_excl, 2)
