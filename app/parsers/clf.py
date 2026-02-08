@@ -11,6 +11,7 @@ from app.parse_utils import approx_equal, first_match, parse_date, parse_money
 _POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/.][0-9]{1,2}[\-/.][0-9]{2,4})\b")
 _MONEY_CAPTURE_RE = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[-+]?\d+(?:\.\d{2})")
+_MONEY_ONLY_RE = re.compile(r"^[£$]?\s*[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})\s*$")
 
 _LEDGER_MAP = {
     "CF10 1AE": 5001,
@@ -232,24 +233,25 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
 
-    def _value_from_line_or_next(idx: int) -> Optional[float]:
-        for offset in range(0, 3):
+    def _next_numeric_value(idx: int) -> Optional[float]:
+        for offset in range(1, 6):
             if idx + offset >= len(lines):
                 break
-            values = _extract_money_values(lines[idx + offset])
-            if values:
-                return values[0]
+            candidate = lines[idx + offset]
+            if _MONEY_ONLY_RE.match(candidate):
+                values = _extract_money_values(candidate)
+                return values[0] if values else None
         return None
 
     for idx, line in enumerate(lines):
         if total_incl is None and re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
-            total_incl = _value_from_line_or_next(idx)
+            total_incl = _next_numeric_value(idx)
             continue
         if vat_amount is None and re.search(r"(VAT\s*Amount|\d{1,2}%\s*VAT)", line, flags=re.IGNORECASE):
-            vat_amount = _value_from_line_or_next(idx)
+            vat_amount = _next_numeric_value(idx)
             continue
         if total_excl is None and re.search(r"Total\s*GBP\s*Excl\.?\s*VAT", line, flags=re.IGNORECASE):
-            total_excl = _value_from_line_or_next(idx)
+            total_excl = _next_numeric_value(idx)
             continue
 
     if vat_amount is None and total_excl is not None and total_incl is not None:
