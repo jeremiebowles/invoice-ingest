@@ -233,7 +233,10 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
 
-    def _next_numeric_value(idx: int) -> Optional[float]:
+    def _line_or_next_numeric_value(idx: int) -> Optional[float]:
+        values = _extract_money_values(lines[idx])
+        if values:
+            return values[0]
         for offset in range(1, 6):
             if idx + offset >= len(lines):
                 break
@@ -249,15 +252,15 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
 
     for idx, line in enumerate(lines):
         if total_incl is None and re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
-            total_incl = _next_numeric_value(idx)
+            total_incl = _line_or_next_numeric_value(idx)
             incl_idx = idx
             continue
         if vat_amount is None and re.search(r"(VAT\s*Amount|\d{1,2}%\s*VAT)", line, flags=re.IGNORECASE):
-            vat_amount = _next_numeric_value(idx)
+            vat_amount = _line_or_next_numeric_value(idx)
             vat_idx = idx
             continue
         if total_excl is None and re.search(r"Total\s*GBP\s*Excl\.?\s*VAT", line, flags=re.IGNORECASE):
-            total_excl = _next_numeric_value(idx)
+            total_excl = _line_or_next_numeric_value(idx)
             excl_idx = idx
             continue
 
