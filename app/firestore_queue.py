@@ -206,3 +206,22 @@ def reserve_reference(
         return True
     except AlreadyExists:
         return False
+
+
+def get_reference_lock(
+    supplier_reference: str, invoice_date: Optional[str], is_credit: Optional[bool]
+) -> Optional[Dict[str, Any]]:
+    if not supplier_reference or not invoice_date:
+        return None
+    key_parts = [supplier_reference.strip().upper()]
+    key_parts.append(str(invoice_date))
+    if is_credit is not None:
+        key_parts.append("credit" if is_credit else "invoice")
+    doc_id = "_".join(key_parts).replace("/", "_")
+    database = _get_database()
+    client = firestore.Client(database=database)
+    col = client.collection(_get_env("FIRESTORE_REFERENCE_COLLECTION") or "reference_locks")
+    snapshot = col.document(doc_id).get()
+    if not snapshot.exists:
+        return None
+    return snapshot.to_dict() or {}

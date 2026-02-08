@@ -21,6 +21,7 @@ from app.firestore_queue import (
     increment_rate_limit,
     list_records,
     find_records_by_reference,
+    get_reference_lock,
     reserve_reference,
     reserve_message_id,
     test_roundtrip,
@@ -650,6 +651,48 @@ async def sage_purchase_invoices_count(
     except Exception as exc:
         logger.exception("Sage invoice count failed: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@app.get("/debug/duplicate-reason")
+async def debug_duplicate_reason(
+    request: Request,
+    ref: str,
+    invoice_date: Optional[str] = None,
+    is_credit: Optional[bool] = None,
+) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+    if not ref or not ref.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing ref")
+
+    records = find_records_by_reference(ref.strip())
+    trimmed: list[Dict[str, Any]] = []
+    for item in records:
+        data = item.get("data") or {}
+        trimmed.append(
+            {
+                "id": item.get("id"),
+                "status": data.get("status"),
+                "duplicate": data.get("duplicate"),
+                "sage": data.get("sage"),
+                "created_at": data.get("created_at"),
+                "message_id": (data.get("payload_meta") or {}).get("message_id"),
+                "invoice_date": (data.get("parsed") or {}).get("invoice_date"),
+            }
+        )
+
+    lock_info = None
+    if invoice_date:
+        lock_info = get_reference_lock(ref.strip(), invoice_date.strip(), is_credit)
+
+    return {
+        "status": "ok",
+        "reference": ref.strip(),
+        "record_count": len(trimmed),
+        "records": trimmed,
+        "reference_lock": lock_info,
+    }
 
 
 @app.post("/sage/post")
