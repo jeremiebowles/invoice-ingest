@@ -20,6 +20,7 @@ from app.firestore_queue import (
     has_recent_posted_match,
     increment_rate_limit,
     list_records,
+    find_records_by_reference,
     reserve_message_id,
     test_roundtrip,
     update_record,
@@ -723,6 +724,85 @@ async def sage_post_latest(request: Request) -> Dict[str, Any]:
 
     if not SAGE_ENABLED:
         logger.info("Sage disabled; skipping /sage/post-latest")
+        update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+        return {"status": "disabled", "record_id": record_id}
+
+    try:
+        if _is_duplicate_post(invoice):
+            duplicate = _duplicate_payload(invoice)
+            skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
+            update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
+            return {"status": "ok", "sage": skip, "record_id": record_id}
+        if invoice.is_credit:
+            sage_result = post_purchase_credit_note(invoice)
+        else:
+            sage_result = post_purchase_invoice(invoice)
+    except Exception as exc:
+        logger.exception("Sage post failed: %s", exc)
+        update_record(record_id, {"status": "error", "error": str(exc)})
+        return {
+            "status": "error",
+            "message": str(exc),
+            "record_id": record_id,
+            "debug": {
+                "invoice": _invoice_to_dict(invoice),
+                "record_id": record_id,
+            },
+        }
+
+    if isinstance(sage_result, dict) and sage_result.get("id"):
+        logger.info("Sage created id: %s", sage_result.get("id"))
+
+    if isinstance(sage_result, dict) and sage_result.get("id"):
+        update_record(record_id, {"status": "posted", "sage": sage_result})
+    elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+        update_record(record_id, {"status": "skipped", "sage": sage_result})
+    else:
+        update_record(record_id, {"status": "unknown", "sage": sage_result})
+
+    return {"status": "ok", "sage": sage_result, "record_id": record_id}
+
+
+@app.post("/sage/post-by-reference")
+async def sage_post_by_reference(
+    request: Request, supplier_reference: str, invoice_date: Optional[str] = None
+) -> Dict[str, Any]:
+    _check_basic_auth(request)
+
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+    if not supplier_reference or not supplier_reference.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing supplier_reference")
+
+    records = find_records_by_reference(supplier_reference.strip())
+    if not records:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No records found for reference")
+
+    record_id = None
+    record = None
+    invoice_date_text = invoice_date.strip() if invoice_date else None
+    if invoice_date_text:
+        for item in records:
+            parsed = (item.get("data") or {}).get("parsed") or {}
+            if str(parsed.get("invoice_date")) == invoice_date_text:
+                record_id = item.get("id")
+                record = item.get("data")
+                break
+    if not record:
+        record_id = records[0].get("id")
+        record = records[0].get("data") if records else None
+
+    if not record_id or not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No matching record found")
+
+    parsed = record.get("parsed")
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Record missing parsed data")
+
+    invoice = _invoice_from_payload(parsed)
+
+    if not SAGE_ENABLED:
+        logger.info("Sage disabled; skipping /sage/post-by-reference")
         update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
         return {"status": "disabled", "record_id": record_id}
 

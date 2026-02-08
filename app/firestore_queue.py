@@ -95,6 +95,17 @@ def list_records(limit: int = 5) -> list[Dict[str, Any]]:
     return results
 
 
+def find_records_by_reference(reference: str, limit: int = 20) -> list[Dict[str, Any]]:
+    if not reference:
+        return []
+    col = _get_collection()
+    results: list[Dict[str, Any]] = []
+    query = col.where("parsed.supplier_reference", "==", reference).limit(limit)
+    for doc in query.stream():
+        results.append({"id": doc.id, "data": doc.to_dict() or {}})
+    return results
+
+
 def get_client_info() -> Dict[str, Any]:
     collection = _get_env("FIRESTORE_COLLECTION") or "sage_queue"
     database = _get_database() or "(default)"
