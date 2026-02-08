@@ -231,22 +231,29 @@ def _extract_totals_block(text: str) -> tuple[Optional[float], Optional[float], 
     total_incl = None
 
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    for line in lines:
+
+    def _value_from_line_or_next(idx: int) -> Optional[float]:
+        for offset in range(0, 3):
+            if idx + offset >= len(lines):
+                break
+            values = _extract_money_values(lines[idx + offset])
+            if values:
+                return values[0]
+        return None
+
+    for idx, line in enumerate(lines):
         if total_incl is None and re.search(r"Total\s*GBP\s*Incl\.?\s*VAT", line, flags=re.IGNORECASE):
-            values = _extract_money_values(line)
-            if values:
-                total_incl = values[0]
+            total_incl = _value_from_line_or_next(idx)
             continue
-        if vat_amount is None and re.search(r"VAT\s*Amount", line, flags=re.IGNORECASE):
-            values = _extract_money_values(line)
-            if values:
-                vat_amount = values[0]
+        if vat_amount is None and re.search(r"(VAT\s*Amount|\d{1,2}%\s*VAT)", line, flags=re.IGNORECASE):
+            vat_amount = _value_from_line_or_next(idx)
             continue
         if total_excl is None and re.search(r"Total\s*GBP\s*Excl\.?\s*VAT", line, flags=re.IGNORECASE):
-            values = _extract_money_values(line)
-            if values:
-                total_excl = values[0]
+            total_excl = _value_from_line_or_next(idx)
             continue
+
+    if vat_amount is None and total_excl is not None and total_incl is not None:
+        vat_amount = round(total_incl - total_excl, 2)
 
     return total_excl, vat_amount, total_incl
 
@@ -324,6 +331,20 @@ def parse_clf(text: str) -> InvoiceData:
     total_gbp = _extract_total_gbp(text)
     if vat_amount is None and totals_vat_amount is not None:
         vat_amount = totals_vat_amount
+
+    if (
+        vat_net is None
+        and nonvat_net is None
+        and total_excl_vat is not None
+    ):
+        if vat_amount is None and total_incl_vat is not None:
+            vat_amount = round(total_incl_vat - total_excl_vat, 2)
+        if vat_amount is not None and vat_amount > 0:
+            vat_net = total_excl_vat
+            nonvat_net = 0.0
+        else:
+            vat_net = 0.0
+            nonvat_net = total_excl_vat
 
     if vat_net is None or nonvat_net is None or vat_amount is None:
         (
