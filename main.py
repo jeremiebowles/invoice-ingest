@@ -431,7 +431,17 @@ def _text_looks_like_hunts(text: str) -> bool:
 
 def _text_looks_like_essential(text: str) -> bool:
     normalized = (text or "").lower()
-    return "essential-trading.coop" in normalized or "essential trading cooperative" in normalized
+    return (
+        "essential-trading.coop" in normalized
+        or "www.essential-trading.coop" in normalized
+        or "sales@essential-trading.coop" in normalized
+        or "essential trading cooperative" in normalized
+        or "essential trading co-operative" in normalized
+        or "essential trading co operative" in normalized
+        or "essential trading cooperative ltd" in normalized
+        or "essential trading co-operative ltd" in normalized
+        or "gb303067304" in normalized
+    )
 
 
 def _text_looks_like_avogel(text: str) -> bool:
@@ -693,6 +703,7 @@ async def debug_duplicate_reason(
                 "status": data.get("status"),
                 "duplicate": data.get("duplicate"),
                 "sage": data.get("sage"),
+                "error": data.get("error"),
                 "created_at": data.get("created_at"),
                 "message_id": (data.get("payload_meta") or {}).get("message_id"),
                 "invoice_date": (data.get("parsed") or {}).get("invoice_date"),
@@ -1222,13 +1233,13 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         if not is_viridian_sender:
             logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
         invoices = [parse_viridian(text)]
-    else:
-        if not is_clf_sender and _text_looks_like_clf(text):
-            is_clf_sender = True
-            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
+    elif is_clf_sender or _text_looks_like_clf(text):
         if not is_clf_sender:
-            logger.info("Sender email not CLF; defaulting to CLF parser: %s", sender_email)
+            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
         invoices = [parse_clf(text)]
+    else:
+        logger.warning("No supplier parser matched; refusing to default to CLF", extra={"sender": sender_email})
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
 
     parsed_payloads = [_invoice_to_dict(inv) for inv in invoices]
     logger.info("Parsed invoice data: %s", parsed_payloads)
