@@ -340,11 +340,41 @@ def _log_pdf_text(text: str) -> None:
     logger.info("Extracted text tail: %s", text[-1200:])
 
 
+def _is_statement_filename(name: str) -> bool:
+    return "statement" in (name or "").lower()
+
+
+def _is_invoice_filename(name: str) -> bool:
+    lowered = (name or "").lower()
+    return any(
+        kw in lowered
+        for kw in (
+            "invoice",
+            "tax invoice",
+            "credit memo",
+            "credit note",
+        )
+    )
+
+
+def _select_pdf_attachment(candidates: list[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not candidates:
+        return None
+    non_statement = [att for att in candidates if not _is_statement_filename(att.get("Name") or "")]
+    invoice_like = [att for att in non_statement if _is_invoice_filename(att.get("Name") or "")]
+    if invoice_like:
+        return invoice_like[0]
+    if non_statement:
+        return non_statement[0]
+    return None
+
+
 def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     attachments = payload.get("Attachments") or []
     if not isinstance(attachments, list):
         return None
 
+    candidates: list[Dict[str, Any]] = []
     for attachment in attachments:
         if not isinstance(attachment, dict):
             continue
@@ -352,9 +382,9 @@ def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, An
         name = (attachment.get("Name") or "").lower()
         if "pdf" in content_type or name.endswith(".pdf"):
             if attachment.get("Content"):
-                return attachment
+                candidates.append(attachment)
 
-    return None
+    return _select_pdf_attachment(candidates)
 
 
 def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -370,17 +400,21 @@ def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, A
             msg = None
 
         if msg:
+            candidates: list[Dict[str, Any]] = []
             for part in msg.walk():
                 content_type = (part.get_content_type() or "").lower()
                 filename = (part.get_filename() or "").lower()
                 if "pdf" in content_type or filename.endswith(".pdf"):
                     payload_bytes = part.get_payload(decode=True)
                     if payload_bytes:
-                        return {
-                            "Name": part.get_filename() or "attachment.pdf",
-                            "ContentType": content_type,
-                            "ContentBytes": payload_bytes,
-                        }
+                        candidates.append(
+                            {
+                                "Name": part.get_filename() or "attachment.pdf",
+                                "ContentType": content_type,
+                                "ContentBytes": payload_bytes,
+                            }
+                        )
+            return _select_pdf_attachment(candidates)
         # If first parse failed to find a PDF and the raw data looks base64-ish, try decoding.
         if attempt == 0 and isinstance(raw, str):
             try:
