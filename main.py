@@ -39,6 +39,7 @@ from app.parsers.natures_plus import parse_natures_plus
 from app.parsers.bionature import parse_bionature
 from app.parsers.natures_aid import parse_natures_aid
 from app.parsers.tonyrefail import parse_tonyrefail
+from app.parsers.essential import parse_essential
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
@@ -426,6 +427,11 @@ def _text_looks_like_hunts(text: str) -> bool:
         or "hub@huntsfoodgroup.co.uk" in normalized
         or "vat no: 813 0548 57" in normalized
     )
+
+
+def _text_looks_like_essential(text: str) -> bool:
+    normalized = (text or "").lower()
+    return "essential-trading.coop" in normalized or "essential trading cooperative" in normalized
 
 
 def _text_looks_like_avogel(text: str) -> bool:
@@ -1184,12 +1190,20 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     is_clf_sender = sender_email.endswith("@clfdistribution.com")
     is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
     is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
+    is_essential_sender = sender_email.endswith("@essential-trading.coop")
 
     invoices: list[InvoiceData]
     if is_hunts_sender or _text_looks_like_hunts(text):
         if not is_hunts_sender:
             logger.info("Sender not Hunts domain but PDF looks like Hunts; using Hunts parser: %s", sender_email)
         invoices = parse_hunts(text)
+    elif is_essential_sender or _text_looks_like_essential(text):
+        if not is_essential_sender:
+            logger.info(
+                "Sender not Essential domain but PDF looks like Essential; using Essential parser: %s",
+                sender_email,
+            )
+        invoices = [parse_essential(text)]
     elif _text_looks_like_watson_pratt(text):
         invoices = [parse_watson_pratt(text)]
     elif _text_looks_like_nestle(text):
