@@ -739,6 +739,34 @@ async def debug_duplicate_reason(
     }
 
 
+@app.get("/debug/latest")
+async def debug_latest_record(request: Request, parsed_only: bool = True) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not FIRESTORE_ENABLED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firestore not enabled")
+
+    result = get_latest_parsed_record() if parsed_only else get_latest_record()
+    if not result:
+        return {"status": "ok", "record": None}
+
+    record_id, data = result
+    return {
+        "status": "ok",
+        "record": {
+            "id": record_id,
+            "status": data.get("status"),
+            "error": data.get("error"),
+            "created_at": data.get("created_at"),
+            "message_id": (data.get("payload_meta") or {}).get("message_id"),
+            "payload_meta": data.get("payload_meta"),
+            "attachment": data.get("attachment"),
+            "parsed": data.get("parsed"),
+            "duplicate": data.get("duplicate"),
+            "sage": data.get("sage"),
+        },
+    }
+
+
 @app.post("/sage/post")
 async def sage_post(request: Request) -> Dict[str, Any]:
     _check_basic_auth(request)
