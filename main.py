@@ -405,7 +405,11 @@ def _extract_sender_email(payload: Dict[str, Any]) -> Optional[str]:
 
 def _text_looks_like_clf(text: str) -> bool:
     normalized = (text or "").lower()
-    return "clf distribution" in normalized or "clf distribution ltd" in normalized
+    return (
+        "clf distribution" in normalized
+        or "clf distribution ltd" in normalized
+        or "gb712190568" in normalized
+    )
 
 
 def _text_looks_like_viridian(text: str) -> bool:
@@ -414,6 +418,7 @@ def _text_looks_like_viridian(text: str) -> bool:
         "viridian international" in normalized
         or "viridian nutrition" in normalized
         or "viridian-nutrition.com" in normalized
+        or "viridian" in normalized
         or "gb738632315" in normalized
     )
 
@@ -424,6 +429,7 @@ def _text_looks_like_hunts(text: str) -> bool:
         "hunt’s food group" in normalized
         or "hunt's food group" in normalized
         or "hunts food group" in normalized
+        or "huntsfoodgroup" in normalized
         or "hub@huntsfoodgroup.co.uk" in normalized
         or "vat no: 813 0548 57" in normalized
     )
@@ -448,6 +454,8 @@ def _text_looks_like_avogel(text: str) -> bool:
     normalized = (text or "").lower()
     return (
         "a.vogel ltd" in normalized
+        or "a vogel ltd" in normalized
+        or "a.vogel" in normalized
         or "avogel.co.uk" in normalized
         or "vat no. 454 9330 37" in normalized
         or "vat no: 454 9330 37" in normalized
@@ -469,8 +477,10 @@ def _text_looks_like_nestle(text: str) -> bool:
     normalized = (text or "").lower()
     return (
         "nestle uk ltd" in normalized
-        and "sales invoice" in normalized
-        and "vat reg no" in normalized
+        or "nestle" in normalized
+        or "nestlé" in normalized
+        or "nestle uk" in normalized
+        or "vat reg no" in normalized and "nestle" in normalized
     )
 
 
@@ -479,6 +489,7 @@ def _text_looks_like_natures_plus(text: str) -> bool:
     return (
         "naturesplus" in normalized
         or "natures plus" in normalized
+        or "nature's plus" in normalized
         or "vat reg no: gb718284519" in normalized
     )
 
@@ -488,6 +499,8 @@ def _text_looks_like_bionature(text: str) -> bool:
     return (
         "bio-nature limited" in normalized
         or "bionature.uk.com" in normalized
+        or "bio nature" in normalized
+        or "bionature" in normalized
         or "vat reg no: 847 3436 08" in normalized
         or "vat reg no: 847 3436 08".replace(" ", "") in normalized.replace(" ", "")
     )
@@ -498,6 +511,8 @@ def _text_looks_like_natures_aid(text: str) -> bool:
     return (
         "natures aid ltd" in normalized
         or "naturesaid.co.uk" in normalized
+        or "nature's aid" in normalized
+        or "natures aid" in normalized
         or "vat reg no: gb 604 7052 68" in normalized
         or "vat reg no: gb604705268" in normalized.replace(" ", "")
     )
@@ -508,6 +523,7 @@ def _text_looks_like_tonyrefail(text: str) -> bool:
     return (
         "tonyrefail apiary" in normalized
         or "tonyrefailapiary@googlemail.com" in normalized
+        or "tonyrefail" in normalized
         or "pure welsh honey" in normalized
     )
 
