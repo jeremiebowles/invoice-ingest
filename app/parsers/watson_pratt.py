@@ -124,6 +124,7 @@ def parse_watson_pratt(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="de28527c07f842b3a12fd9d4298f7055",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

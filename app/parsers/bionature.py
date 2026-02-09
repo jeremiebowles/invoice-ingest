@@ -96,6 +96,7 @@ def parse_bionature(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="a86c0c45c364492394f743bc09db5c90",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

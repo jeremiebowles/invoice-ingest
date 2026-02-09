@@ -100,6 +100,7 @@ def parse_natures_plus(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="011268104d684327bb5707c8886e7339",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

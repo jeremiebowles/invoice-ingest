@@ -187,6 +187,7 @@ def parse_viridian(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="36ee5838c7a54c799c2cf60c667b41b0",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

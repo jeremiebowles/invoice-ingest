@@ -377,7 +377,7 @@ def _already_exists(
 
 def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
-    contact_id = _get_env("SAGE_CONTACT_ID")
+    contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")
     if not business_id or not contact_id:
         raise RuntimeError("Missing Sage business/contact configuration")
 
@@ -428,7 +428,7 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
 
 def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
-    contact_id = _get_env("SAGE_CONTACT_ID")
+    contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")
     if not business_id or not contact_id:
         raise RuntimeError("Missing Sage business/contact configuration")
 
@@ -479,7 +479,7 @@ def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
 
 def sage_invoice_exists(invoice: InvoiceData) -> bool:
     business_id = _get_env("SAGE_BUSINESS_ID")
-    contact_id = _get_env("SAGE_CONTACT_ID")
+    contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")
     if not business_id or not contact_id:
         raise RuntimeError("Missing Sage business/contact configuration")
 

@@ -142,6 +142,7 @@ def parse_natures_aid(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="4aef1b19bf73426fb4e52a5a803277e9",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

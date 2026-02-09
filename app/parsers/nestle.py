@@ -144,6 +144,7 @@ def parse_nestle(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="5e9d739c44d64621898bd8b526a2d472",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

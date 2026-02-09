@@ -141,6 +141,7 @@ def parse_avogel(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="1cc12fd2293c4eb48365ed85ccb5f2f6",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

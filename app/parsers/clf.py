@@ -455,6 +455,7 @@ def parse_clf(text: str) -> InvoiceData:
         is_credit=is_credit,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="dab5878edaf44d3ebd8413c3aeac5dc5",
         vat_net=max(vat_net, 0.0),
         nonvat_net=max(nonvat_net, 0.0),
         vat_amount=max(vat_amount, 0.0),

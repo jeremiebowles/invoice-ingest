@@ -15,6 +15,7 @@ class InvoiceData(BaseModel):
     is_credit: bool = False
     deliver_to_postcode: Optional[str] = None
     ledger_account: Optional[int] = None
+    contact_id: Optional[str] = None
     vat_net: float = Field(ge=0)
     nonvat_net: float = Field(ge=0)
     vat_amount: float = Field(ge=0)

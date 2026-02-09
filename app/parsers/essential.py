@@ -129,6 +129,7 @@ def parse_essential(text: str) -> InvoiceData:
         is_credit=False,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="8f5ba20961ed4e7585fe0d122bbcaed7",
         vat_net=round(vat_net or 0.0, 2),
         nonvat_net=round(nonvat_net or 0.0, 2),
         vat_amount=round(vat_amount or 0.0, 2),

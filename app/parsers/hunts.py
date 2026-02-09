@@ -175,6 +175,7 @@ def _parse_section(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="76ef2eec964848e2bae7e9d8fe15a633",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,

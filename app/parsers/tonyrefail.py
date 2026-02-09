@@ -96,6 +96,7 @@ def parse_tonyrefail(text: str) -> InvoiceData:
         due_date=due_date,
         deliver_to_postcode=postcode,
         ledger_account=ledger_account,
+        contact_id="92cbebef85424457befc01b894ea8cf0",
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,
