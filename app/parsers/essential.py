@@ -63,15 +63,32 @@ def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Option
 
 
 def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
-    lower = text or ""
-    start = lower.find("Net (£)")
+    normalized = text or ""
+    # Prefer explicit VAT Analysis table lines: T0 (zero) and T1 (standard)
+    t0_match = re.search(
+        r"^T0\s+0(?:\.0+)?\s+([0-9,]+\.\d{2})\s+([0-9,]+\.\d{2})",
+        normalized,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    t1_match = re.search(
+        r"^T1\s+20(?:\.0+)?\s+([0-9,]+\.\d{2})\s+([0-9,]+\.\d{2})",
+        normalized,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    if t0_match or t1_match:
+        nonvat_net = parse_money(t0_match.group(1)) if t0_match else None
+        vat_net = parse_money(t1_match.group(1)) if t1_match else None
+        vat_amount = parse_money(t1_match.group(2)) if t1_match else None
+        return vat_net, nonvat_net, vat_amount
+
+    start = normalized.find("Net (£)")
     if start == -1:
         return None, None, None
-    end = lower.find("VAT (£)", start)
+    end = normalized.find("VAT (£)", start)
     if end == -1:
         return None, None, None
-    net_block = lower[start:end]
-    vat_block = lower[end:]
+    net_block = normalized[start:end]
+    vat_block = normalized[end:]
     vat_end = vat_block.find("VAT Analysis")
     if vat_end != -1:
         vat_block = vat_block[:vat_end]
@@ -103,9 +120,18 @@ def parse_essential(text: str) -> InvoiceData:
     warnings = []
     if vat_net is None or nonvat_net is None or vat_amount is None:
         warnings.append("VAT analysis missing; using order totals")
-        vat_net = vat_net or 0.0
-        nonvat_net = nonvat_net or 0.0
-        vat_amount = vat_amount or order_vat or 0.0
+        vat_amount = vat_amount if vat_amount is not None else (order_vat or 0.0)
+        if order_net is not None:
+            if vat_amount > 0:
+                derived_vat_net = round(vat_amount / 0.2, 2)
+                vat_net = vat_net if vat_net is not None else derived_vat_net
+                nonvat_net = nonvat_net if nonvat_net is not None else round(order_net - derived_vat_net, 2)
+            else:
+                vat_net = vat_net if vat_net is not None else 0.0
+                nonvat_net = nonvat_net if nonvat_net is not None else order_net
+        else:
+            vat_net = vat_net if vat_net is not None else 0.0
+            nonvat_net = nonvat_net if nonvat_net is not None else 0.0
 
     net_total = round((vat_net or 0.0) + (nonvat_net or 0.0), 2)
     total = order_total or round(net_total + (vat_amount or 0.0), 2)
