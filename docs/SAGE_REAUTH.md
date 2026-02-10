@@ -46,10 +46,13 @@ Cloud Run → `invoice-ingest` → Edit & Deploy New Revision → Variables & Se
 ```
 SAGE_REFRESH_TOKEN = <LONG_TOKEN>
 SAGE_ENABLED = 1
-SAGE_CLIENT_ID = a30eb717-39e1-c1a6-8534-12d7282b51c1/e635d3f7-0c76-423c-9dbc-839804fa48a9
-SAGE_CLIENT_SECRET = -^JVhr7GzhQyJzzIi]hB
+SAGE_CLIENT_ID = <CLIENT_ID>
+SAGE_CLIENT_SECRET = <CLIENT_SECRET>
 ```
 Deploy.
+
+Never store real credentials in this repo. Use Secret Manager for `SAGE_CLIENT_ID`,
+`SAGE_CLIENT_SECRET`, and `SAGE_REFRESH_TOKEN`, and reference them in Cloud Run.
 
 ## 5) Verify Refresh Works
 ```
