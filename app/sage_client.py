@@ -82,7 +82,30 @@ def _refresh_access_token() -> str:
         headers={"Accept": "application/json"},
         timeout=30,
     )
-    resp.raise_for_status()
+    if resp.status_code >= 400:
+        # The default requests exception message drops the response body, which is where
+        # Sage tells us whether this is invalid_grant, invalid_client, etc.
+        snippet = (resp.text or "")[:2000]
+        body: Dict[str, Any]
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"raw": snippet}
+
+        # Do not log tokens even if Sage ever returned them unexpectedly.
+        redacted = dict(body) if isinstance(body, dict) else {"raw": snippet}
+        for k in ("access_token", "refresh_token", "id_token"):
+            if k in redacted:
+                redacted[k] = "<redacted>"
+
+        logger.error(
+            "Sage token refresh failed: HTTP %s body=%s env_hashes=%s",
+            resp.status_code,
+            redacted,
+            sage_env_hashes(),
+        )
+        raise RuntimeError(f"Sage token refresh failed: HTTP {resp.status_code} {redacted}")
+
     data = resp.json()
     new_refresh = data.get("refresh_token")
     if new_refresh:
