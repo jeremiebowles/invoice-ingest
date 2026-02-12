@@ -10,7 +10,10 @@ from datetime import date, datetime
 import re
 from typing import Any, Dict, Optional
 
+from urllib.parse import quote, urlencode
+
 from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 
 from app.firestore_queue import (
     enqueue_record,
@@ -1136,22 +1139,40 @@ async def sage_firestore_info(request: Request) -> Dict[str, Any]:
     return {"status": "ok", "info": get_client_info()}
 
 
+SAGE_CALLBACK_PATH = "/sage/callback"
+POSTMAN_REDIRECT_URI = "https://oauth.pstmn.io/v1/browser-callback"
+
+
+def _sage_callback_uri(request: Request) -> str:
+    """Build the absolute callback URI from the incoming request's host."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host") or request.url.netloc
+    return f"{scheme}://{host}{SAGE_CALLBACK_PATH}"
+
+
+def _sage_auth_url(client_id: str, redirect_uri: str) -> str:
+    params = urlencode(
+        {
+            "filter": "apiv3.1",
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "full_access",
+            "state": "123",
+        },
+        quote_via=quote,
+    )
+    return f"https://www.sageone.com/oauth2/auth/central?{params}"
+
+
 @app.get("/sage/auth-url")
-async def sage_auth_url(request: Request) -> Dict[str, str]:
+async def sage_auth_url(request: Request, use_callback: bool = True) -> Dict[str, str]:
     _check_basic_auth(request)
     client_id = os.getenv("SAGE_CLIENT_ID")
     if not client_id:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Missing SAGE_CLIENT_ID")
-    url = (
-        "https://www.sageone.com/oauth2/auth/central"
-        "?filter=apiv3.1"
-        "&response_type=code"
-        f"&client_id={client_id.replace('/', '%2F')}"
-        "&redirect_uri=https%3A%2F%2Foauth.pstmn.io%2Fv1%2Fbrowser-callback"
-        "&scope=full_access"
-        "&state=123"
-    )
-    return {"url": url}
+    redirect_uri = _sage_callback_uri(request) if use_callback else POSTMAN_REDIRECT_URI
+    return {"url": _sage_auth_url(client_id, redirect_uri), "redirect_uri": redirect_uri}
 
 
 @app.post("/sage/exchange")
@@ -1169,8 +1190,10 @@ async def sage_exchange(request: Request) -> Dict[str, Any]:
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code")
 
+    redirect_uri = payload.get("redirect_uri", POSTMAN_REDIRECT_URI)
+
     try:
-        tokens = exchange_auth_code(str(code).strip())
+        tokens = exchange_auth_code(str(code).strip(), redirect_uri=redirect_uri)
     except Exception as exc:
         logger.exception("Sage exchange failed: %s", exc)
         raise HTTPException(
@@ -1183,6 +1206,43 @@ async def sage_exchange(request: Request) -> Dict[str, Any]:
         "refresh_token": tokens.get("refresh_token"),
         "expires_in": tokens.get("expires_in"),
     }
+
+
+@app.get("/sage/callback", response_class=HTMLResponse)
+async def sage_callback(request: Request, code: str = "", error: str = "", state: str = ""):
+    _check_basic_auth(request)
+
+    if error:
+        return HTMLResponse(
+            content=f"<h1>Sage Auth Failed</h1><p>{error}</p>",
+            status_code=400,
+        )
+
+    if not code:
+        return HTMLResponse(
+            content="<h1>Sage Auth Failed</h1><p>No authorization code received.</p>",
+            status_code=400,
+        )
+
+    redirect_uri = _sage_callback_uri(request)
+    try:
+        tokens = exchange_auth_code(code.strip(), redirect_uri=redirect_uri)
+    except Exception as exc:
+        logger.exception("Sage callback exchange failed: %s", exc)
+        return HTMLResponse(
+            content=f"<h1>Sage Auth Failed</h1><p>Token exchange failed: {exc}</p>",
+            status_code=502,
+        )
+
+    logger.info("Sage callback: auth complete, token stored")
+    return HTMLResponse(
+        content=(
+            "<h1>Sage Auth Complete</h1>"
+            "<p>Refresh token has been stored in Secret Manager.</p>"
+            f"<p>Expires in: {tokens.get('expires_in')} seconds</p>"
+        ),
+        status_code=200,
+    )
 
 
 @app.post("/postmark/inbound")

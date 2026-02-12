@@ -109,7 +109,17 @@ def _refresh_access_token() -> str:
     data = resp.json()
     new_refresh = data.get("refresh_token")
     if new_refresh:
-        _store_refresh_token(new_refresh)
+        try:
+            _store_refresh_token(new_refresh)
+        except Exception:
+            logger.critical(
+                "CRITICAL: Failed to store rotated refresh token in Secret Manager. "
+                "The old token is now invalid. "
+                "New token hash: %s",
+                _sha256(new_refresh),
+                exc_info=True,
+            )
+            raise
     return data["access_token"]
 
 
@@ -195,7 +205,7 @@ def debug_refresh_token(refresh_token: str) -> Dict[str, Any]:
         return {"status": "error", "http_status": resp.status_code, "body": body}
     return {"status": "ok"}
 
-def exchange_auth_code(code: str) -> Dict[str, Any]:
+def exchange_auth_code(code: str, redirect_uri: str = "https://oauth.pstmn.io/v1/browser-callback") -> Dict[str, Any]:
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")
 
@@ -207,7 +217,7 @@ def exchange_auth_code(code: str) -> Dict[str, Any]:
         data={
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": "https://oauth.pstmn.io/v1/browser-callback",
+            "redirect_uri": redirect_uri,
             "client_id": client_id,
             "client_secret": client_secret,
         },
@@ -215,7 +225,23 @@ def exchange_auth_code(code: str) -> Dict[str, Any]:
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+
+    new_refresh = data.get("refresh_token")
+    if new_refresh:
+        try:
+            _store_refresh_token(new_refresh)
+            logger.info("Stored refresh token from code exchange in Secret Manager")
+        except Exception:
+            logger.critical(
+                "CRITICAL: Failed to store refresh token from code exchange. "
+                "Token hash: %s -- manually store this token or re-auth.",
+                _sha256(new_refresh),
+                exc_info=True,
+            )
+            # Don't re-raise here: return the tokens so the caller can recover manually.
+
+    return data
 
 
 def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
