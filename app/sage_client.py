@@ -145,6 +145,16 @@ def debug_refresh() -> Dict[str, Any]:
             body = resp.json()
         except ValueError:
             body = {"raw": resp.text[:2000]}
+        redacted = dict(body) if isinstance(body, dict) else {"raw": resp.text[:2000]}
+        for k in ("access_token", "refresh_token", "id_token"):
+            if k in redacted:
+                redacted[k] = "<redacted>"
+        logger.error(
+            "Sage debug refresh failed: HTTP %s body=%s env_hashes=%s",
+            resp.status_code,
+            redacted,
+            sage_env_hashes(),
+        )
         return {"status": "error", "http_status": resp.status_code, "body": body}
     return {"status": "ok"}
 
@@ -172,6 +182,16 @@ def debug_refresh_token(refresh_token: str) -> Dict[str, Any]:
             body = resp.json()
         except ValueError:
             body = {"raw": resp.text[:2000]}
+        redacted = dict(body) if isinstance(body, dict) else {"raw": resp.text[:2000]}
+        for k in ("access_token", "refresh_token", "id_token"):
+            if k in redacted:
+                redacted[k] = "<redacted>"
+        logger.error(
+            "Sage debug refresh token failed: HTTP %s body=%s env_hashes=%s",
+            resp.status_code,
+            redacted,
+            sage_env_hashes(),
+        )
         return {"status": "error", "http_status": resp.status_code, "body": body}
     return {"status": "ok"}
 
