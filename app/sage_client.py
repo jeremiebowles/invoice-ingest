@@ -132,50 +132,23 @@ def check_sage_auth() -> Dict[str, Any]:
 
 
 def debug_refresh() -> Dict[str, Any]:
-    client_id = _get_env("SAGE_CLIENT_ID")
-    client_secret = _get_env("SAGE_CLIENT_SECRET")
-    refresh_token = _get_refresh_token()
-
-    if not client_id or not client_secret or not refresh_token:
-        return {"status": "error", "message": "Missing Sage OAuth env vars"}
-
-    resp = requests.post(
-        SAGE_TOKEN_URL,
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": client_id,
-            "client_secret": client_secret,
-        },
-        headers={"Accept": "application/json"},
-        timeout=30,
-    )
-    if resp.status_code >= 400:
-        try:
-            body = resp.json()
-        except ValueError:
-            body = {"raw": resp.text[:2000]}
-        redacted = dict(body) if isinstance(body, dict) else {"raw": resp.text[:2000]}
-        for k in ("access_token", "refresh_token", "id_token"):
-            if k in redacted:
-                redacted[k] = "<redacted>"
-        logger.error(
-            "Sage debug refresh failed: HTTP %s body=%s env_hashes=%s",
-            resp.status_code,
-            redacted,
-            sage_env_hashes(),
-        )
-        return {"status": "error", "http_status": resp.status_code, "body": body}
+    try:
+        _refresh_access_token()
+    except Exception as exc:
+        return {"status": "error", "message": str(exc)}
     return {"status": "ok"}
 
 
 def debug_refresh_token(refresh_token: str) -> Dict[str, Any]:
+    """Test a specific refresh token value (does NOT store the rotated token)."""
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")
 
     if not client_id or not client_secret:
         return {"status": "error", "message": "Missing Sage OAuth env vars"}
 
+    # WARNING: This burns the provided token without saving the replacement.
+    # Only use for one-off diagnostics, never for the production token.
     resp = requests.post(
         SAGE_TOKEN_URL,
         data={
