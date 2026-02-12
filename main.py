@@ -1210,7 +1210,8 @@ async def sage_exchange(request: Request) -> Dict[str, Any]:
 
 @app.get("/sage/callback", response_class=HTMLResponse)
 async def sage_callback(request: Request, code: str = "", error: str = "", state: str = ""):
-    _check_basic_auth(request)
+    # No basic auth here -- browser redirect from Sage can't carry credentials.
+    # The OAuth code is single-use and requires client_secret to exchange.
 
     if error:
         return HTMLResponse(
