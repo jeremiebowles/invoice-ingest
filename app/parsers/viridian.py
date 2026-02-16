@@ -52,57 +52,45 @@ def _extract_total(text: str) -> Optional[float]:
 
 
 def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
-    lines = [line.strip() for line in (text or "").splitlines()]
+    """Parse the VAT Analysis table from Viridian invoices.
+
+    pdfplumber renders the table as tab-like rows, e.g.:
+        T1 20.00 178.09 35.62
+        T0 0.00 12.42 0.00
+    """
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     try:
         start = next(i for i, line in enumerate(lines) if "vat analysis" in line.lower())
     except StopIteration:
         return None, None, None
 
-    section: list[str] = []
-    for line in lines[start + 1 :]:
-        if re.search(r"^Terms:|^Goods Net:|^Delivery:|^Order Net:|^Total:", line, flags=re.IGNORECASE):
-            break
-        if line:
-            section.append(line)
-
-    def _collect_after(label: str) -> list[str]:
-        try:
-            idx = next(i for i, line in enumerate(section) if line.lower() == label.lower())
-        except StopIteration:
-            return []
-        values: list[str] = []
-        for line in section[idx + 1 :]:
-            if re.search(r"^Tax Code$|^VAT %$|^Net \\(£\\)$|^VAT \\(£\\)$", line):
-                break
-            values.append(line)
-        return values
-
-    tax_codes = _collect_after("Tax Code")
-    vat_rates = _collect_after("VAT %")
-    net_values = _collect_after("Net (£)")
-    vat_values = _collect_after("VAT (£)")
-
     vat_net = 0.0
     nonvat_net = 0.0
     vat_amount = 0.0
+    found = False
 
-    for idx, net in enumerate(net_values):
-        net_val = parse_money(net)
-        if net_val is None:
-            continue
-        rate = None
-        if idx < len(vat_rates):
-            rate = parse_money(vat_rates[idx])
-        code = tax_codes[idx] if idx < len(tax_codes) else ""
-        if (rate is not None and rate > 0) or code.upper().startswith("T1"):
-            vat_net += net_val
-        else:
-            nonvat_net += net_val
+    for line in lines[start + 1:]:
+        if re.search(r"^Terms:", line, flags=re.IGNORECASE):
+            break
+        # Match T-code lines: T1 20.00 178.09 35.62
+        m = re.match(r"^(T\d+)\s+([\d.]+)\s+([\d.,]+)\s+([\d.,]+)", line)
+        if m:
+            code = m.group(1).upper()
+            rate = parse_money(m.group(2))
+            net_val = parse_money(m.group(3))
+            vat_val = parse_money(m.group(4))
+            if net_val is None:
+                continue
+            found = True
+            if (rate is not None and rate > 0) or code == "T1":
+                vat_net += net_val
+            else:
+                nonvat_net += net_val
+            if vat_val is not None:
+                vat_amount += vat_val
 
-    for val in vat_values:
-        vat_val = parse_money(val)
-        if vat_val is not None:
-            vat_amount += vat_val
+    if not found:
+        return None, None, None
 
     return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2)
 
