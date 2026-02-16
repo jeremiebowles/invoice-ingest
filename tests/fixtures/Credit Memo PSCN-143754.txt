@@ -1,0 +1,35 @@
+Sales - Credit Memo
+Page 1
+Beanfreaks Ltd CLF Distribution
+Jeremie Bowles 210 Mauretania Road
+8 Royal Arcade Nursling Industrial Estate
+Morgan Quarter Southampton
+Cardiff, CF10 1AE Hampshire SO16 0YS
+United Kingdom
+Phone No. (023) 8127 7000
+Fax No. (023) 8127 7001
+VAT Reg. No. GB712190568
+Bank
+Bank Sort Cod
+Account No.
+Bill-to Customer No. CN-00003 4. February 2026
+Credit Memo No. PSCN-143754
+Salesperson Territory 3 -SW & W. Midlands
+Posting/Tax Point Dat 04/02/26
+Prices Including VAT No
+Unit of VAT
+No. Description Quantity Measu Unit Price Disc. % Identifier Amount
+BMC4 Vanilla Kefir Yoghurt 1 0.90 Z 0.90
+SO-2377781
+SB
+Total GBP 0.90
+Reverse Charge 0.00
+Payment Discount
+Type of Supply Ex Works
+Ship-to Address
+Sell-to Customer No. CN-25320
+CLF Distribution Ltd
+210 Mauretania Road
+Nursling Industrial Estate
+Southampton
+Hampshire SO16 0YS

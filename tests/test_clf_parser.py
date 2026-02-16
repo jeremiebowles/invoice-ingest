@@ -190,3 +190,47 @@ class TestCLFPostcodeExtraction:
         result = parse_clf(text)
         assert result.deliver_to_postcode == "CF10 1AE"
         assert result.ledger_account == 5001
+
+
+# ---------------------------------------------------------------------------
+# Credit Memo: PSCN-143754 → CF10 1AE (ledger 5001)
+# Different layout: customer address top-left, Ship-to shows CLF warehouse
+# ---------------------------------------------------------------------------
+
+class TestCLFCreditMemo143754:
+    @pytest.fixture(autouse=True)
+    def parse(self):
+        text = _load_fixture("Credit Memo PSCN-143754.txt")
+        self.result = parse_clf(text)
+
+    def test_supplier(self):
+        assert self.result.supplier == "CLF"
+
+    def test_is_credit(self):
+        assert self.result.is_credit is True
+
+    def test_credit_number(self):
+        assert self.result.supplier_reference == "PSCN-143754"
+
+    def test_invoice_date(self):
+        assert self.result.invoice_date == date(2026, 2, 4)
+
+    def test_postcode_from_billing_not_shipto(self):
+        """CF10 1AE from billing address, not SO16 0YS from Ship-to Address."""
+        assert self.result.deliver_to_postcode == "CF10 1AE"
+
+    def test_ledger_account(self):
+        assert self.result.ledger_account == 5001
+
+    def test_zero_vat(self):
+        assert self.result.vat_net == 0.0
+        assert self.result.vat_amount == 0.0
+
+    def test_nonvat_net(self):
+        assert self.result.nonvat_net == pytest.approx(0.90, abs=0.01)
+
+    def test_total(self):
+        assert self.result.total == pytest.approx(0.90, abs=0.01)
+
+    def test_no_warnings(self):
+        assert self.result.warnings == []
