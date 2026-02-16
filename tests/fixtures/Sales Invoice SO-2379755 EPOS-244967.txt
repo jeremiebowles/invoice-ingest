@@ -1,0 +1,914 @@
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 1
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+AA-T142 Absolute Aromas Clove Bud Oil 10ml 10ml 1 1 2.54 5.29 42 0.51 2.54
+AA-T170 Absolute Aromas Rose Absolute 5% 1 1 3.69 7.49 41 0.74 3.69
+Dilution Oil 10ml
+AA-T555 Absolute Aromas Jojoba Oil 50ml 50ml 1 1 3.39 6.99 42 0.67 3.39
+AIN21 Ainsworths Arnica 30C Homoeopathic 1 1 4.87 8.99 35 0.98 4.87
+Remedy 120 tablet
+ALT4 AlterEco Dark Chocolate with Almond 4 4 2.23 4.39 39 1.78 8.92
+100g
+AMI14 Amisa Quinoa Fibre Plus Crispbread 100g 1 1 1.25 1.89 34 0.00 1.25
+AQCP4 AQUA Carpatica Still Natural Mineral 6 0 SD 0.00 1.99 0 0.00 0.00
+Water 1.5l
+ASH44 AUSHA Organic Haritaki Powder 200g 1 1 5.19 8.99 42 0.00 5.19
+ASP-001 Aspall Org Cyder Vinegar 500ml 2 2 2.15 3.29 35 0.00 4.30
+AVG-10037 A Vogel Herbamare 250g 1 1 3.64 4.99 27 0.00 3.64
+BARC1 Barleycup Organic Chicory Cup 100g 1 1 3.65 5.59 35 0.00 3.65
+BBN11 Bold Bean Co Organic White Beans 570g 2 2 2.62 4.29 39 0.00 5.24
+BBN12 Bold Bean Co Queen Butter Beans 570g 2 2 2.62 4.29 39 0.00 5.24
+BBN14 Bold Bean Co Queen Red Beans 570g 1 0 CLF 0.00 4.29 0 0.00 0.00
+BBN15 Bold Bean Co Queen Black Beans 570g 2 2 2.62 4.29 39 0.00 5.24
+BBW62 Bambaw Stainless-steel floss | PLA 1each 1 1 4.10 8.19 40 0.82 4.10
+BCC28 Biona Chilled Organic Horseradish Relish 2 2 2.71 3.79 28 0.00 5.42
+125g
+BCC7 Biona Chilled Organic Falafel Balls 200g 1 1 3.14 4.39 28 0.00 3.14
+BD14 Bio-D Washing Up Liquid Grapefruit 750ml 2 2 1.64 3.09 36 0.66 3.28
+BD6 Bio-D Laundry Bleach 400g 1 1 1.46 2.79 37 0.29 1.46
+BD7 Bio-D Fabric Conditioner Juniper 1l 1 1 2.42 4.49 35 0.48 2.42
+BD-BLL121 Bio-D Laundry Liquid 1l 1 1 3.61 6.79 36 0.72 3.61
+BEE-100170 Bee Health Propolis 1000mg 90 capsule 1 0 SUP 0.00 12.96 0 0.00 0.00
+BEE-100230 Bee Health Propolis Lozenges 120g 1 1 1.14 2.55 46 0.23 1.14
+BEN-XCAPS Obbekjaers Obbekjaers Extra Strength 1 1 6.23 11.69 36 1.24 6.23
+OAD 60 capsule
+BGG-002 Braggs Charcoal Tabs 300mg 250 tablet 2 0 SD 0.00 10.89 0 0.00 0.00
+BH-HB53CV Bio Health Slippery Elm 120 capsule 1 1 11.09 23.29 43 2.22 11.09
+BIL-35250 Billingtons Golden Caster Sugar 1000g 2 2 2.31 3.89 41 0.00 4.62
+BK-60 Bio-Kult Bio-Kult Everyday 60 capsule 1 1 13.29 22.79 30 2.66 13.29
+BNA-10094 Biona Org Spelt White Tagliatelle 250g 1 1 1.52 2.29 34 0.00 1.52
+BNA-11596 Biona Org Agave Dark Syrup 350g 1 1 2.77 4.19 34 0.00 2.77
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 2
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+BNA-12289 Biona Organic Oaty Granola 375g 1 1 2.71 4.09 34 0.00 2.71
+BNA-12357 Biona Beetroot Juice Pressed 500ml 2 2 1.48 2.69 34 0.59 2.96
+BNA126 Biona Edamame Beans Organic 200g 1 1 1.45 2.19 34 0.00 1.45
+BNA-1604 Biona Organic Hemp Seed Oil 250ml 1 1 4.65 6.99 33 0.00 4.65
+BNA-1612 Biona Org Sliced Beetroot 340g 1 1 1.46 2.19 33 0.00 1.46
+BNA-1615 Biona Org Sauerkraut 360g 2 2 1.59 2.39 33 0.00 3.18
+BNA-1628 Biona Organic Sauerkraut 680g 1 1 2.52 3.79 34 0.00 2.52
+BNA163 Biona Org Kombucha Original 330ml 3 3 1.89 3.39 33 1.13 5.67
+BNA165 Biona Org Kombucha Cherry Mint 330ml 1 1 1.89 3.39 33 0.38 1.89
+BNA176 Biona Condensed Coconut Milk 210g 2 2 1.58 2.39 34 0.00 3.16
+BNA187 Biona Organic Brown Lentil Curry 400g 1 1 1.45 2.19 34 0.00 1.45
+BNA-212 Biona Rye Bread Organic 500g 2 2 1.79 2.69 33 0.00 3.58
+BNA237 Biona Organic Gherkins 680g 2 0 SUP 0.00 5.69 0 0.00 0.00
+BNA-3607 Biona Rye Bread Omega Organic 500g 1 1 1.79 2.69 33 0.00 1.79
+BNA-4178 Biona Organic Coconut Milk 400ml 3 3 1.59 2.39 33 0.00 4.77
+BNA-43106 Biona Org Hemp Seed 250g 3 0 SUP 0.00 2.99 0 0.00 0.00
+BNA-5038 Biona Org Wholemeal Spelt Fusilli 500g 2 2 1.91 2.89 34 0.00 3.82
+BNA-7513 Biona Organic Pure Cranberry Juice 750ml 1 1 6.05 10.99 34 1.21 6.05
+BNA-9234 Biona Org Spelt White Spaghetti 500g 1 1 2.24 3.39 34 0.00 2.24
+BNA-9241 Biona Org Spelt White Penne 500g 1 1 2.28 3.39 33 0.00 2.28
+BOO57 Booja-Booja Award-Winning Selection 1 1 8.45 14.99 32 1.69 8.45
+184g
+BRA- Bragg Bragg Apple Cider Vinegar 946ml 1 1 8.26 11.99 31 0.00 8.26
+ARC003
+BRA- Bragg Bragg Apple Cider Vinegar 473ml 2 2 4.84 6.99 31 0.00 9.68
+RFJ5729
+BTH12 Biethica Biethica Organic Lions Mane 75g 1 1 9.06 12.99 30 0.00 9.06
+CA-01 Active Edge CherryActive Concentrate 1 1 20.42 37.99 36 4.08 20.42
+946ml
+CAU1 Fullgreen Riced Cauliflower Original 200g 6 0 CLF 0.00 2.79 0 0.00 0.00
+CBL7 Cheerful Buddha Lion's Mane Mushroom 1 0 SD 0.00 13.99 0 0.00 0.00
+Coffee 150g
+CCH- Cocos Org Natural Coconut Yoghurt 400g 4 4 4.13 5.79 29 0.00 16.52
+400NAT
+CDP15 Coldpress Pineapple Coconut Banana 1 0 SUP 0.00 2.29 0 0.00 0.00
+250ml
+CDP27 Coldpress Survive & Thrive 250ml 1 1 1.34 2.29 30 0.27 1.34
+CHIK1 Chikko Not Coffee Roasted Chicory 150g 2 0 CLF 0.00 5.99 0 0.00 0.00
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 3
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+CLIP161 Clipper FT & Org Everyday Decaf Tea 1 1 4.77 7.39 35 0.00 4.77
+80bag
+CLIP166 Clipper FT & Org White Tea 40bag 1 1 2.46 3.89 37 0.00 2.46
+CLIP175 Clipper Organic Assam Tea 40bag 1 0 CLF 0.00 3.09 0 0.00 0.00
+CLIP210 Clipper Clipper Organic Nocaf 100g 1 0 SUP 0.00 3.59 0 0.00 0.00
+CLIP27 Clipper Organic Rooibos Tea Bags 80bag 3 3 3.33 5.19 36 0.00 9.99
+CLIP-4632 Clipper Organic Peppermint Tea Bags 2 2 1.84 2.89 36 0.00 3.68
+20bag
+CLIP-8254 Clipper House Blend Coffee 100g 2 2 5.45 8.49 36 0.00 10.90
+CLIP-8272 Clipper House Blend Organic R&G 227g 1 1 4.11 6.39 36 0.00 4.11
+CLN2 Calon Wen Extra Mature Cheddar Cheese 1 1 2.81 4.49 37 0.00 2.81
+200g
+CLR-1001 Clearspot Clearspot Organic Tofu 280g 2 2 1.51 2.59 42 0.00 3.02
+CLS118 Clearspring Org Rye Crispbread Original 1 1 1.07 1.59 33 0.00 1.07
+200g
+CLS165 Clearspring Og Japanese White Miso jar 3 3 2.83 4.29 34 0.00 8.49
+270g
+CLS190 Clearspring Demeter Silverskin Onions 1 0 SUP 0.00 3.89 0 0.00 0.00
+340g
+CLS198 Clearspring Organic Chickpea Miso 150g 2 2 2.65 3.99 34 0.00 5.30
+150g
+CLS201 Clearspring Organic Coconut Blossom 2 0 SUP 0.00 4.99 0 0.00 0.00
+Syrup 300g
+CLS237 Clearspring Org Japanese Wide Udon 1 1 2.36 3.49 32 0.00 2.36
+Noodles 200g
+CLS257 Clearspring Organic Soya Chunks 200g 1 1 2.34 3.49 33 0.00 2.34
+CLS54 Clearspring Org GF Instant Couscous 2 2 1.54 2.29 33 0.00 3.08
+200g
+CLS67 Clearspring Organic Oatcakes - Traditional 1 1 2.24 3.29 32 0.00 2.24
+200g
+CLS-CS321 Clearspring Organic GF Brown Rice 1 1 3.09 4.69 34 0.00 3.09
+Amazake 380g
+CLS-CS412 Clearspring Organic Shoyu Sauce 500ml 1 1 4.30 6.49 34 0.00 4.30
+CLS-CS427 Clearspring Organic Yaemon Tamari 1 1 6.93 10.49 34 0.00 6.93
+Sauce 500ml
+CLS-CS446 Clearspring Organic Brown Rice Miso in 2 2 3.83 5.79 34 0.00 7.66
+Jar 300g
+CLS-CS492 Clearspring Instant Miso Soup Paste + Veg 2 2 2.24 3.29 32 0.00 4.48
+60g
+CLS-CS601 Clearspring Organic Brown Rice Vinegar 1 1 1.78 2.69 34 0.00 1.78
+150ml
+CLT6 Celestial Seasonings Sleepytime Extra Tea 1 1 2.64 3.99 34 0.00 2.64
+20bag
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 4
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+COTS-01DA Cotswold Health Products Dandelion Leaf 2 2 1.72 2.79 38 0.00 3.44
+Tea 100g
+COTS-01PE Cotswold Health Products Peppermint Tea 2 0 CLF 0.00 3.69 0 0.00 0.00
+100g
+COTS-01RA Cotswold Health Products Raspberry Leaf 2 0 SD 0.00 3.29 0 0.00 0.00
+Tea 100g
+COTS-02DA Cotswold Health Products Dandelion 2 0 SD 0.00 3.49 0 0.00 0.00
+Coffee 100g
+COTS- Cotswold Health Products Dandelion 2 0 SD 0.00 6.89 0 0.00 0.00
+02DAC Coffee 200g
+CRL-1766 Carley's Org Raw Sunflower Seed Butter 1 1 1.79 2.79 36 0.00 1.79
+250g
+CYA2 Cheeky Panda Bamboo Toilet Tissue 2 2 4.92 8.99 34 1.97 9.84
+9pack
+CYA39 Cheeky Panda Cheeky Panda Pads Heavy 2 0 SUP 0.00 2.79 0 0.00 0.00
+12pads
+DBL45 Diablo Sugar Free Milk Chocolate with 3 3 1.43 2.79 38 0.86 4.29
+Almonds 75g
+DEL11 Delphi Classic Houmous Dip 170g 2 2 0.84 1.29 35 0.00 1.68
+DF17 Doves Farm White Rye Flour Organic 1kg 5 0 SUP 0.00 2.39 0 0.00 0.00
+DF- Doves Farm Gluten Free Org Chocolate 2 2 2.23 3.29 32 0.00 4.46
+CHSTARSX Star 300g
+8
+DF- Doves Farm Org Brown Rice Fusilli 400g 4 4 2.20 3.29 33 0.00 8.80
+PABRFU06
+DF-PLWTMP Doves Farm Org Plain White Flour 1000g 5 5 1.36 1.99 32 0.00 6.80
+DPE13 Delphis Eco Cream Cleaner 500ml 3 0 SUP 0.00 3.99 0 0.00 0.00
+DRS-4016 Dr Stuarts Slim Plus Herbal Tea 15bag 4 4 1.93 3.29 41 0.00 7.72
+DRV4 Dr Vegan Choline 600mg 60 capsule 1 1 4.72 8.99 37 0.94 4.72
+ECD8 Esti Chilled Lemon Hummus 150g 1 1 1.63 2.69 39 0.00 1.63
+ECO-2010 Ecover Washing Up Liquid Cam & Clem 1 1 2.46 4.29 31 0.49 2.46
+950ml
+ECO-2110 Ecover Washing Up Liquid Lemon/Aloe V 1 1 2.46 4.29 31 0.49 2.46
+950ml
+ECO71 Ecover Dishwasher tablets AllinOne 24 1 1 4.38 7.99 34 0.88 4.38
+tablet
+ECZ13 Ecover Zero Laundry Liq non-bio Zero 1 1 6.56 11.89 34 1.31 6.56
+1430ml
+ECZ2 Ecover Zero Zero Delicate Laundry Liquid 1 1 2.83 5.19 34 0.57 2.83
+1000ml
+ENF-21 Everfresh Natural Foods Org Sprout Rye 1 1 1.74 2.89 40 0.00 1.74
+Bread 400g
+EOC-8068 Eleven O'clock Eleven O'Clock Rooibos 1 1 1.85 2.79 34 0.00 1.85
+Tea 40bag
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 5
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+EQE11 Equal Exchange Org Dark Roast Coffee 1 0 SUP 0.00 7.49 0 0.00 0.00
+Beans 200g
+EQE- Equal Exchange Org Colombian R&G 1 1 5.16 7.99 35 0.00 5.16
+OSCN8 Coffee 200g
+EQE-OWN8 Equal Exchange Org Grown By Women 1 1 4.85 7.49 35 0.00 4.85
+R&G Coffee 200g
+ETR74 Eat Real Hummus Chips Sea Salt 110g 5 5 1.47 2.39 38 0.00 7.35
+ETW1 Eat Wholesome Org Raw Sauerkraut 500g 2 2 3.10 4.59 32 0.00 6.20
+FIN122 Faith in Nature Wild Rose Body Wash 1 1 3.32 6.49 39 0.66 3.32
+400ml 400ml
+FIN26 Faith in Nature Coconut Conditioner 400ml 1 1 4.09 7.99 39 0.82 4.09
+FRN1 Free & Easy Organic Vegetable Hotpot 1 1 2.20 3.39 35 0.00 2.20
+400g
+FRN18 Free & Easy Egg Replacer 135g 2 0 SUP 0.00 3.09 0 0.00 0.00
+FRT- Frutina 100%Fruit Snack 60 x 15g 1 1 23.50 44.99 37 4.70 23.50
+BARAU001
+FSH65 Fushi Wellbeing Triphala 60 capsule 1 1 8.07 14.99 35 1.61 8.07
+FSH7 Fushi Wellbeing Black Cumin Seed Oil 1 1 9.68 14.99 35 0.00 9.68
+Organic 100ml
+FSY11 Fussy Deodorant Refill Cloud Nine 40g 1 1 3.00 5.99 40 0.60 3.00
+FSY12 Fussy Refillable Deodorant Cld Nine 40g 1 1 6.50 12.99 40 1.30 6.50
+FSY9 Fussy Refillable Deodorant Cnt Milk 40g 1 1 6.50 12.99 40 1.30 6.50
+GHEE2 Ghee Easy Organic Ghee 245g 1 1 5.25 8.09 35 0.00 5.25
+GNG32 Green Origins Organic Super Mushroom 1 1 9.35 14.99 38 0.00 9.35
+Blend 100g
+GORG2 Greens Organic Organic Spirulina Powder 1 1 3.41 7.09 42 0.68 3.41
+100g
+H5-ZCIT High 5 ZERO Citrus 20 tablet 2 0 SUP 0.00 7.99 0 0.00 0.00
+HAD-802055 HealthAid Creatine Monohydrate 1000mg 2 2 7.81 13.99 33 3.13 15.62
+60 tablet
+HPT10 Hampstead Tea Organic Demeter 1 1 2.08 Promo 3.79 45 0.00 2.08
+Darjeeling Tea 20bag 15%
+HRI1 HRI Water Balance 60 tablet 2 0 SUP 0.00 8.99 0 0.00 0.00
+HTG17 Hunter and Gather Classic Olive Oil 1 1 4.00 6.19 35 0.00 4.00
+Mayonnaise 250g
+HTY1 Honestly Tasty Honestly Tasty Blue 140g 1 1 3.40 5.69 40 0.00 3.40
+IYC-P8764 If You Care Baking Sheets Cut 1 1 2.22 4.59 42 0.44 2.22
+Unbleached 127g
+JGF21 Just Natural Gluten Free Org GF Jumbo 1 1 2.89 4.79 40 0.00 2.89
+Oats 1000g
+JGF8 Just Natural Gluten Free Org GF Quinoa 1 1 3.07 5.09 40 0.00 3.07
+Grain 500g
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 6
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+JN10 Just Natural Organic Org Pumpkin Seeds 1 1 4.47 7.39 40 0.00 4.47
+500g
+JN100 Just Natural Organic Org Omega 3 Seed 2 2 2.41 3.99 40 0.00 4.82
+Mix 500g
+JN11 Just Natural Organic Org Pumpkin Seeds 1 1 2.47 4.09 40 0.00 2.47
+250g
+JN111 Just Natural Organic Org Wheat Bran 3 0 SUP 0.00 2.09 0 0.00 0.00
+350g
+JN127 Just Natural Organic Org Popping Corn 2 2 1.50 2.49 40 0.00 3.00
+500g
+JN129 Just Natural Organic Org Apricots 3 3 3.98 6.59 40 0.00 11.94
+Unsulphured 250g
+JN134 Just Natural Organic Org Brazils Broken 2 2 4.47 7.39 40 0.00 8.94
+250g
+JN148 Just Natural Organic Org Mixed Nuts 250g 2 2 3.86 6.39 40 0.00 7.72
+JN150 Just Natural Organic Org Pine Nuts 80g 1 1 2.53 4.19 40 0.00 2.53
+JN17 Just Natural Organic Org Golden Linseed 1 1 1.02 1.69 40 0.00 1.02
+250g
+JN18 Just Natural Organic Org Pitted Prunes 1 1 5.31 8.79 40 0.00 5.31
+500g
+JN185 Just Natural Organic Org Black Rice 500g 1 1 2.47 4.09 40 0.00 2.47
+JN20 Just Natural Organic Org Oat Bran 350g 3 3 1.26 2.09 40 0.00 3.78
+JN22 Just Natural Organic Org Oatmeal Medium 2 2 1.26 2.09 40 0.00 2.52
+500g
+JN23 Just Natural Organic Org Oatmeal Coarse 1 1 1.38 2.29 40 0.00 1.38
+500g
+JN231 Just Natural Organic Org Coconut Chips 1 1 2.11 3.49 40 0.00 2.11
+Raw 250g
+JN234 Just Natural Organic Org Pecan Halves 1 1 4.77 7.89 40 0.00 4.77
+250g
+JN238 Just Natural Organic Org Muesli Base 4 0 SUP 0.00 2.19 0 0.00 0.00
+500g
+JN24 Just Natural Organic Org Almonds Flaked 1 1 2.05 3.39 40 0.00 2.05
+125g
+JN247 Just Natural Organic Org Juice Infused 1 1 3.80 6.29 40 0.00 3.80
+Cranberries 250g
+JN248 Just Natural Organic Org Porridge Oats 2 2 1.44 2.39 40 0.00 2.88
+500g
+JN249 Just Natural Organic Org Jumbo Oats 2 2 1.44 2.39 40 0.00 2.88
+500g
+JN255 Just Natural Organic Org Steel Cut Oats 2 2 1.38 2.29 40 0.00 2.76
+500g
+JN257 Just Natural Organic Org Chia Seeds 500g 3 3 3.07 5.09 40 0.00 9.21
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 7
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+JN26 Just Natural Organic Org Almonds Whole 2 2 5.37 8.89 40 0.00 10.74
+500g
+JN272 Just Natural Organic Org Hemp Protein 2 2 2.05 3.19 36 0.00 4.10
+Powder 200g
+JN275 Just Natural Organic Org Milled Flaxseed 1 1 1.86 3.09 40 0.00 1.86
+350g
+JN288 Just Natural Organic Org Tapioca Flour 1 1 1.80 2.99 40 0.00 1.80
+500g
+JN289 Just Natural Organic Org Almonds 1 1 1.93 3.19 39 0.00 1.93
+Blanched 125g
+JN311 Just Natural Organic Org Medjool Dates 1 1 2.95 4.89 40 0.00 2.95
+250g
+JN350 Just Natural Organic Org Sundried 1 1 1.32 2.19 40 0.00 1.32
+Tomatoes 125g
+JN36 Just Natural Organic Org Brazils Whole 1 1 10.09 16.69 40 0.00 10.09
+500g
+JN362 Just Natural Organic Org Pea Protein 2 0 NEW 0.00 5.29 0 0.00 0.00
+Powder 350g
+JN364 Just Natural Organic Org Lentils Red Split 2 2 2.65 4.39 40 0.00 5.30
+1000g
+JN365 Just Natural Organic Org Cherries Sour 1 1 4.28 7.09 40 0.00 4.28
+250g
+JN39 Just Natural Organic Org Sesame Seeds 2 2 1.56 2.59 40 0.00 3.12
+Unhulled 250g
+JN48 Just Natural Organic Org Coconut 1 1 1.86 3.09 40 0.00 1.86
+Desiccated 250g
+JN50 Just Natural Organic Org Couscous 2 2 1.50 2.49 40 0.00 3.00
+Wholemeal 500g
+JN51 Just Natural Organic Org Macadamia Nuts 1 1 2.71 4.49 40 0.00 2.71
+125g
+JN52 Just Natural Organic Org Currants 250g 1 1 2.29 3.79 40 0.00 2.29
+JN53 Just Natural Organic Org Pitted Dates 1 1 2.83 4.69 40 0.00 2.83
+500g
+JN54 Just Natural Organic Org Pitted Dates 3 3 1.74 2.89 40 0.00 5.22
+250g
+JN55 Just Natural Organic Org Figs (Lerida) 1 1 5.43 8.99 40 0.00 5.43
+500g
+JN64 Just Natural Organic Org Long Grain 1 1 2.95 4.89 40 0.00 2.95
+Brown Rice 1000g
+JN66 Just Natural Organic Org Chia Seeds 250g 5 5 1.80 2.99 40 0.00 9.00
+JN69 Just Natural Organic Org Millet Flakes 2 0 NEW 0.00 3.29 0 0.00 0.00
+400g
+JN7 Just Natural Organic Org Cashews Whole 2 2 1.74 2.89 40 0.00 3.48
+125g
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 8
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+JN71 Just Natural Organic Org Maca Powder 1 1 2.23 3.69 40 0.00 2.23
+200g
+JN74 Just Natural Organic Org Porridge Oats 2 2 2.29 3.79 40 0.00 4.58
+1000g
+JN86 Just Natural Organic Org Red Split Lentils 2 2 1.68 2.79 40 0.00 3.36
+500g
+JN9 Just Natural Organic Org Raisins 2 2 3.01 4.99 40 0.00 6.02
+Thompson Seedless 500g
+JN98 Just Natural Organic Org Sultanas 500g 1 1 3.20 5.29 40 0.00 3.20
+JNLH10 Just Natural Herbs Org Cinnamon Ground 1 0 NEW 0.00 1.99 0 0.00 0.00
+Jar 30g
+JNLH-1006 Just Natural Herbs Org Cardamom Pods 1 1 1.20 1.99 40 0.00 1.20
+Box 10g
+JNLH-1012 Just Natural Herbs Org Cloves Whole Box 2 2 1.20 1.99 40 0.00 2.40
+20g
+JNLH-1013 Just Natural Herbs Org Coriander Seed 2 0 NEW 0.00 1.69 0 0.00 0.00
+Box 40g
+JNLH-1018 Just Natural Herbs Org Curry Leaves Box 1 0 NEW 0.00 1.39 0 0.00 0.00
+5g
+JNLH-1020 Just Natural Herbs Org Dill Herb Box 15g 2 0 NEW 0.00 1.49 0 0.00 0.00
+JNLH-1022 Just Natural Herbs Org Fenugreek Seed 2 0 NEW 0.00 1.69 0 0.00 0.00
+Box 40g
+JNLH-1049 Just Natural Herbs Org Peppercorn Black 2 0 NEW 0.00 3.59 0 0.00 0.00
+Mill 55g
+JNLH16 Just Natural Herbs Org Cumin Ground Jar 1 0 NEW 0.00 2.99 0 0.00 0.00
+45g
+JNLH18 Just Natural Herbs Org Curry Powder Jar 1 1 1.50 2.49 40 0.00 1.50
+55g
+JNLH25 Just Natural Herbs Org Herbes De 1 0 NEW 0.00 1.99 0 0.00 0.00
+Provence Jar 25g
+JNLH36 Just Natural Herbs Org Paprika Jar 60g 1 1 1.44 2.39 40 0.00 1.44
+JNLH43 Just Natural Herbs Org Sage Jar 14g 1 0 NEW 0.00 1.59 0 0.00 0.00
+JNLH51 Just Natural Herbs Org Paprika Smoked 1 1 1.08 1.79 40 0.00 1.08
+Box 25g
+JNLH61 Just Natural Herbs Org Ginger Ground 1 1 3.07 5.09 40 0.00 3.07
+300g
+JNLH68 Just Natural Herbs Org Onion Powder Box 1 0 NEW 0.00 1.79 0 0.00 0.00
+50g
+JNLH7 Just Natural Herbs Org Cayenne Pepper 1 1 1.50 2.49 40 0.00 1.50
+Jar 45g
+JNLH72 Just Natural Herbs Org Sumac Jar 60g 2 0 NEW 0.00 3.29 0 0.00 0.00
+JNLH73 Just Natural Herbs Org Sumac Box 30g 1 0 NEW 0.00 1.99 0 0.00 0.00
+JNW179 Just Natural Wholesome Yoghurt Coated 1 0 SUP 0.00 2.89 0 0.00 0.00
+Banana Chips 250g
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 9
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+JNW183 Just Natural Wholesome Yoghurt Coated 1 1 0.95 1.89 40 0.19 0.95
+Cashews 80g
+JNW193 Just Natural Wholesome Yoghurt Coated 1 1 1.65 3.29 40 0.33 1.65
+Raisins 250g
+JNW38 Just Natural Wholesome Goji Berries 125g 2 2 1.38 2.29 40 0.00 2.76
+JNW64 Just Natural Wholesome Carob Coated 1 0 NEW 0.00 1.69 0 0.00 0.00
+Ginger 80g
+JNW7 Just Natural Wholesome Whole Almonds 2 2 2.35 3.89 40 0.00 4.70
+250g
+JNW95 Just Natural Wholesome Dark Chocolate 1 1 3.47 6.89 40 0.69 3.47
+Coated Brazils 250g
+JW25 James White Prune Juice 750ml 2 2 2.39 4.49 36 0.96 4.78
+KAL24 Kallo Low Salt Org Beef Stock Cubes 48g 2 0 CLF 0.00 2.09 0 0.00 0.00
+KAL93 Kallo Kallo Organic Cornflakes 375g 3 3 2.22 3.49 36 0.00 6.66
+KDA4 Kinda Co Vegan Spirulina Blue Block 120g 1 1 4.33 6.99 38 0.00 4.33
+KGS-KS308 King Soba Org Brown Rice Wakame 2 2 1.99 3.09 36 0.00 3.98
+Noodles 250g
+KIN2 Kingfisher Charcoal Natural Toothpaste 2 2 2.09 3.69 32 0.84 4.18
+100ml
+KIN-BS100 Kingfisher Baking Soda Toothpaste 100ml 1 1 2.09 3.69 32 0.42 2.09
+KRL9 Kourellas Organic Sheep Feta PDO 150g 2 0 SD 0.00 4.19 0 0.00 0.00
+LIZ-30212 Lizi's Original Granola Cereal 400g 2 2 2.65 4.19 37 0.00 5.30
+LNW-300 Linwoods Org Milled Flaxseed 425g 3 3 3.84 5.89 35 0.00 11.52
+LNW-336 Linwoods Milled Flaxseed Nuts & Q10 Mix 1 1 4.61 6.99 34 0.00 4.61
+360g
+LNW37 Linwoods Org Milled Hemp with Flax/Chia 2 2 3.26 4.89 33 0.00 6.52
+200g
+LOF18 LoofCo Kitchen Cloth 2-pack 2-Packcloth 1 1 2.22 3.99 33 0.44 2.22
+LOF24 LoofCo LoofCo Back Scrubber Singlepads 1 1 2.72 4.89 33 0.54 2.72
+LTT-LAOBH Littleover Apiaries Orange Blossom Honey 1 1 3.44 5.49 37 0.00 3.44
+340g
+LVG10 Loving Foods Organic Kimchi 475g 1 1 4.60 7.49 39 0.00 4.60
+MAK25 Manuka Manuka Antibacterial Wound 30g 1 0 SUP 0.00 19.99 0 0.00 0.00
+MAL1 Maldon Salt Smoked Sea Salt 125g 1 1 2.15 3.09 30 0.00 2.15
+MER- Meridian Crunchy Cashew Butter 170g 1 1 2.58 3.89 34 0.00 2.58
+04566050
+MER- Meridian Org Light Tahini 270g 1 1 2.97 4.49 34 0.00 2.97
+10574050
+MER- Meridian Barley Malt Extract 370g 2 2 2.45 3.69 34 0.00 4.90
+15579050
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 10
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+MER- Meridian Org Crunch Peanut Butter 100% 1 1 7.13 10.79 34 0.00 7.13
+32565050 1000g
+MER- Meridian Org Cashew Butter 170g 1 0 SD 0.00 3.99 0 0.00 0.00
+3564050
+METH-022 Method All Purpose Floor Care 739ml 1 1 2.55 4.99 39 0.51 2.55
+METH94 Method Body Wash Wind Down 532ml 1 0 SUP 0.00 6.99 0 0.00 0.00
+MGM7 Mummy Meegz M'z Gems Peanut Sharing 2 2 1.72 3.29 37 0.69 3.44
+Bag 80g
+MLA10 Mellona Raw Honey with Bee Pollen 400g 1 1 5.48 8.99 39 0.00 5.48
+MLA7 Mellona Raw Honey Ginger & Turmeric 1 1 4.90 8.09 39 0.00 4.90
+400g
+MNZ68 Montezumas Chocolate Absolute Black 3 3 1.64 Promo 3.99 51 0.99 4.92
+Nibs & Orange 90g 15%
+MNZ82 Montezumas Chocolate Truffle Bites 2 0 SUP 0.00 4.99 0 0.00 0.00
+Peanut Butter 120g
+MORG-002 Mr Organic Olives & Capers Pasta Sauce 1 1 2.24 3.29 32 0.00 2.24
+350g
+MORG-008 Mr Organic Chopped Tomatoes Tin(BPA- 3 3 1.13 1.69 33 0.00 3.39
+free) 400g
+MORG107 Mr Organic Red Lentil Rice 250g 1 1 2.44 3.69 34 0.00 2.44
+MORG25 Mr Organic Tofu Ragu 350g 1 1 2.18 3.29 34 0.00 2.18
+MORG99 Mr Organic Orange Biscuits & Cocoa 1 1 2.04 3.09 34 0.00 2.04
+beans 250g
+MRG10 Marigold Marigold Mo-Du Braised Seitan 2 0 SUP 0.00 3.19 0 0.00 0.00
+225g
+MRG20 Marigold Engevita Protein Fibre Pink 100g 2 2 2.44 3.69 34 0.00 4.88
+MRG-3741 Marigold Organic Vegan Bouillon Red 1 1 1.68 2.59 35 0.00 1.68
+150g
+MRG-542 Marigold Original Vegan Bouillon Green 2 2 1.60 2.39 33 0.00 3.20
+150g
+MRG-543 Marigold Marigold Bouillon Green 500g 1 1 4.78 7.29 34 0.00 4.78
+500g
+MRG-545 Marigold Less Salt Veg Bouillon Purple 1 1 1.63 2.49 35 0.00 1.63
+150g
+MRG-553 Marigold Engevita B12 Yeast Flakes Blue 1 1 2.71 4.19 35 0.00 2.71
+100g
+MRG-5825 Marigold Marigold Organic Gravy 110g 1 1 1.74 2.69 35 0.00 1.74
+MRG-8834 Marigold Organic Less Salt Veg Bouillon 1 1 1.72 2.59 34 0.00 1.72
+140g
+MTT20 Mutti Organic Tomato Puree 185g 4 4 1.69 Promo 3.29 49 0.00 6.76
+15%
+MVM2 Moving Mountains Plant Based Hotdogs 4 2 0 SD 0.00 4.49 0 0.00 0.00
+x 60g
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 11
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+MVM8 Moving Mountains Fingers Fish Style 300g 2 0 SUP 0.00 3.89 0 0.00 0.00
+NA-10630 Natures Aid Multi Vitamins & Minerals 90 2 2 5.72 11.99 43 2.29 11.44
+capsule
+NA-125820 Natures Aid Ucalm 300mg (St Johns Wort) 2 0 SUP 0.00 11.49 0 0.00 0.00
+60 tablet
+NA-127320 Natures Aid SleepEezy Valerian Root 4 0 SUP 0.00 10.99 0 0.00 0.00
+Extrac 60 tablet
+NA-132610 Natures Aid Vitamin C 1000MG 2 0 SUP 0.00 4.99 0 0.00 0.00
+Effervescent 20 tablet
+NA18 Natures Aid Childrens Multi-Vitamin Drops 3 3 4.30 8.99 43 2.58 12.90
+50ml
+NA75 Natures Aid 100% Pure MCT Oil 500ml 1 1 11.44 19.99 43 0.00 11.44
+NAE23 Nature's Truth Pumpkin Seed Oil 2000mg 1 0 SUP 0.00 Promo 8.99 0 0.00 0.00
+60softgels 20%
+NAI-9127 Nairns Organic Oat Cakes 250g 2 2 1.10 Promo 2.19 50 0.00 2.20
+15%
+NAI93 Nairns Salted Crackers 125g 2 2 1.72 2.69 36 0.00 3.44
+NLP23 New Leaf Products CoQ10 Capsules 120 1 1 7.10 15.49 45 1.42 7.10
+capsule
+NN6 New Nordic Clear Brain 60 tablet 1 1 12.65 26.69 43 2.53 12.65
+NP-60366 Natures Path Maple Sunrise 332g 1 1 2.95 4.49 34 0.00 2.95
+NRH1 Nourish Kefir Nourish Kefir Organic 500ml 2 2 3.16 4.49 30 0.00 6.32
+NRH10 Nourish Kefir Nourish Kefir Starter 1 0 SUP 0.00 7.69 0 0.00 0.00
+Cultures 6g
+NT2 Naturli Naturli Vegan Spreadable 450g 2 2 2.80 4.29 35 0.00 5.60
+NTC2 Natracare Ultra Extra Pads Regular 1 1 1.67 2.69 38 0.00 1.67
+12pads
+NTC-3080 Natracare Ultra Pads Super with Wings 1 1 1.66 2.69 38 0.00 1.66
+12pieces
+NTX- Natex Natex Reduced Salt 225g 1 0 SD 0.00 5.29 0 0.00 0.00
+500YE01
+OCN24 OceanSaver Non-Bio Laundry Sheets 2 2 3.79 6.99 35 1.52 7.58
+30Pack 30strips
+OHR7 Organic Herd Organic Herd Salted Butter 1 1 2.53 3.99 37 0.00 2.53
+250g
+OLV-OLIVA Oliva Olive Oil Soap 125g 3 3 1.03 1.99 38 0.62 3.09
+OMB16 Ombar Ombar 72% Cacao 70g 70g 10 0 CLF 0.00 3.59 0 0.00 0.00
+OMB23 Ombar Ombar Salt & Nibs 70g 70g 10 0 CLF 0.00 3.59 0 0.00 0.00
+OMB25 Ombar Centres Hazelnut Truffle 70g 10 10 1.97 3.59 34 3.94 19.70
+OMB49 Ombar Pistachio Cream Filled Bar 42g 15 0 SUP 0.00 2.39 0 0.00 0.00
+OPN9 One Planet Peppernomi Vegan Pizza 310g 1 1 3.74 5.39 31 0.00 3.74
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 12
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+ORK34 Organic Kitchen Org Extra Virgin Coconut 1 1 2.65 4.39 40 0.00 2.65
+Oil 200g
+ORK37 Organic Kitchen Organic Coconut Milk 3 3 1.32 2.19 40 0.00 3.96
+400ml
+ORK38 Organic Kitchen Organic Coconut Milk 5 0 SUP 0.00 1.39 0 0.00 0.00
+200ml
+ORK42 Organic Kitchen Organic Vegan 2 2 1.80 2.99 40 0.00 3.60
+Mayonnaise 240ml
+ORK59 Organic Kitchen Org Virgin Rapeseed Oil 1 1 2.89 4.79 40 0.00 2.89
+500ml
+ORK9 Organic Kitchen Organic Lentils 400g 2 2 0.84 1.39 40 0.00 1.68
+OSG9 Ossa Organic Organic Tallow 265g 1 1 7.15 10.89 34 0.00 7.15
+PAL6 The Paleo Foods Co Low Sugar Grain- 1 1 3.83 5.99 36 0.00 3.83
+Free granola 285g
+PAN-L7284 Panda Licorice Mix 170g 12 12 1.63 3.19 39 3.91 19.56
+PAN-L7896 Panda Licorice Cuts 240g 4 4 1.66 3.29 40 1.33 6.64
+PE1 Puressentiel Purifying Antibacterial Gel 2 0 SUP 0.00 3.99 0 0.00 0.00
+80ml
+PHA3 Alpha01 Sunflower Lecithin 1200mg 2 2 4.00 7.99 40 1.60 8.00
+90softgels
+PH-DMAN30 Power Health D Mannose 1000mg 30 1 1 5.07 10.39 41 1.01 5.07
+tablet
+PH-PMR30 Power Health Marshmallow Root Powder 2 0 SD 0.00 4.99 0 0.00 0.00
+500mg 30 capsule
+PIT-DM6 Pitrok Frag Spray Deodorant Men 100ml 1 1 3.43 6.69 39 0.68 3.43
+PNH15 Plenish Organic Oat Barista Milk 1l 4 4 1.74 2.59 33 0.00 6.96
+POT-MAL12 Potters Malt Extract Cod Liver Oil 650g 2 0 SUP 0.00 12.89 0 0.00 0.00
+PUK11 Pukka Herbs Organic Supreme Green 1 1 3.20 Promo 4.99 36 0.00 3.20
+Matcha 20bag
+PUK112 Pukka Herbs Organic Tulsi Clarity tea 1 1 3.20 4.99 36 0.00 3.20
+20bag
+PVI1 Pure Via Stevia Granules 250g 1 1 2.90 4.89 41 0.00 2.90
+RAW-11572 Raw Health Acacia Honey Organic 350g 1 1 4.42 6.69 34 0.00 4.42
+RAW-11688 Raw Health Org Raw Apple Cider Vinegar 1 1 2.33 3.49 33 0.00 2.33
+500ml
+RAY-47069 Rayners Essentials Org Black Treacle 1 0 SUP 0.00 3.79 0 0.00 0.00
+340g
+RHY8 Rhythm 108 Double Choc Tea Biscuit Bag 2 2 2.20 3.69 40 0.00 4.40
+135g
+RIC6 Ricola Cough Drops Original Herb Bag 1 1 0.70 Promo 1.49 44 0.14 0.70
+75g 15%
+RJ-1005 RJ Licorice Natural Soft Licorice 300g 4 0 SUP 0.00 3.89 0 0.00 0.00
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 13
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+RKC13 Rebel Kitchen Chilled Organic Coconut 2 2 1.94 3.99 42 0.78 3.88
+Water 330ml
+RUD12 Rude Health Organic Coconut Drink 1l 3 3 1.79 Promo 2.99 40 0.00 5.37
+10%
+RWD29 VBites All Day Bcn Rashers 115g 2 0 SD 0.00 3.39 0 0.00 0.00
+SAL-1770 Floradix Calcium Liquid Mineral 250ml 1 0 SUP 0.00 11.99 0 0.00 0.00
+SAL-4750 Floradix Floradix Liquid Iron Formula 1 1 12.23 22.99 36 2.45 12.23
+500ml
+SAL-5707 Floradix Floradix Liquid Iron Formula 2 2 7.43 14.99 40 2.97 14.86
+250ml
+SAM-354000 Sambucol Sambucol Extra Defence 120ml 1 1 7.90 13.39 29 1.58 7.90
+SBN2 Sambazon Acai Unsweetened Superfruit 4 2 2 3.66 5.59 35 0.00 7.32
+x 100g
+SE6 Salt Of the Earth Lavender&Vanilla Nat 1 1 3.47 7.49 44 0.69 3.47
+Deo Spray 100ml
+SLC10 Salcura Antiac DAILY Face Wash 150ml 1 1 5.88 11.99 41 1.18 5.88
+SOJ23 Sojade Org Unsweetened Soya Drink 12 12 1.47 2.19 33 0.00 17.64
+1000ml
+SOJ33 Sojade Org Greek Style Soya Yogurt 400g 3 3 1.66 2.39 31 0.00 4.98
+SONN6 Sonnentor Org Turmeric Latte Ginger Box 1 0 CLF 0.00 4.99 0 0.00 0.00
+60g
+SOU1 Soul Kitchen Thai Beetroot and Coconut 4 4 0.99 1.79 45 0.00 3.96
+Soup 25g
+SOU3 Soul Kitchen Curry SweetPotato & Pumpk 4 4 0.99 1.79 45 0.00 3.96
+Soup 25g
+SPLT21 Splat Biomed Charcoal Toothpaste 100g 1 1 2.12 3.99 36 0.42 2.12
+SPP3 Seep Single Sponge Scourer 20g 4 4 1.53 2.99 38 1.22 6.12
+SPP8 Seep Rubber Gloves [Large] 70g 2 2 2.01 3.99 39 0.81 4.02
+SRT12 Strong Roots Gluten Free Proper Chips 2 2 2.41 Promo 4.29 44 0.00 4.82
+750g 10%
+STD-03-284 St Dalfour Black Cherry Fruit Spread 284g 2 2 2.31 3.69 37 0.00 4.62
+STD-10-284 St Dalfour Raspberry Fruit Spread 284g 2 2 2.31 3.69 37 0.00 4.62
+SUM2 Suma Ecoleaf Toilet Tissue 9pack 1 1 3.70 6.99 36 0.74 3.70
+SUM32 Suma Suma Sausage Mix 350g 1 0 SUP 0.00 5.79 0 0.00 0.00
+SUM-NF209 Suma Ecoleaf Toilet Tissue 4pack 2 2 1.74 3.29 36 0.70 3.48
+SUN-100P Sunita Pistachio Honey Halva 75g 2 2 1.25 1.89 34 0.00 2.50
+TAI17 Taifun Organic Smoked Tofu 200g 2 0 CLF 0.00 4.19 0 0.00 0.00
+TAI18 Taifun Org Smoke Tofu Almond Sesame 1 0 SUP 0.00 4.79 0 0.00 0.00
+200g
+TAI21 Taifun Org Tofu Filets Japanese Style 160g 4 0 CLF 0.00 3.99 0 0.00 0.00
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 14
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+TAI23 Taifun Org Tofu Sausages Mild Peppery 3 0 SUP 0.00 5.49 0 0.00 0.00
+250g
+TAI24 Taifun Org Tofu Sausages Tofiner 300g 6 0 SUP 0.00 6.39 0 0.00 0.00
+TAI25 Taifun Organic Feto Natural Tofu 200g 1 0 CLF 0.00 4.59 0 0.00 0.00
+TAKA5 Taka Turmeric Turmeric & Black Pepper 2 2 10.05 17.99 33 4.02 20.10
+120 capsule
+TAL8 Prima Italia Org GF Arrabbiata Sauce 350g 1 1 1.80 2.99 40 0.00 1.80
+TRW5 Tropical Wholefoods Org Mango Fairtrade 1 1 2.95 4.99 41 0.00 2.95
+100g
+TT-9018 Tick Tock Loose Leaf Tea 100g 2 2 1.81 2.79 35 0.00 3.62
+VGE2 Vego Mini Whole Hazelnut Choc Bar 65g 5 5 1.65 2.79 29 1.65 8.25
+VLF20 Violife Violife Smoked Slices 200g 1 1 2.28 3.49 35 0.00 2.28
+VLF51 Violife Violife Cheddarton 200g 1 1 2.14 3.29 35 0.00 2.14
+VTR17 Vintage Roots Bordeaux Superieur 1 1 12.78 19.79 22 2.56 12.78
+Couronneau 750ml
+VVN- Vivani Fine Dark 71% Cocoa Chocolate 1 1 2.08 3.99 38 0.41 2.08
+6239220 80g
+WBB16 Woobamboo Interdental Brush Picks Small 1 1 3.49 6.29 34 0.69 3.49
+8unit
+WBB21 Woobamboo Zero Waste Medium 3 3 2.65 4.79 34 1.59 7.95
+Toothbrush 1brush
+WEL7 Weleda Calendula Shampoo & Body Wash 1 1 4.21 8.29 39 0.84 4.21
+200ml
+WID10 Wild Men's Mint & Aloe Vera Refill 40g 2 2 3.00 5.99 40 1.20 6.00
+WID13 Wild Men's Thunderstorm Refill 40g 2 2 3.02 5.99 39 1.21 6.04
+WID33 Wild Men's Cedar Sandalwood Refill 40g 2 2 3.00 5.99 40 1.20 6.00
+WID8 Wild Cherry Blossom Deo Refill 40g 2 2 3.00 5.99 40 1.20 6.00
+WIL10 Wiley's Finest UK Peak EPA 30 capsule 1 1 11.03 21.99 40 2.21 11.03
+YOI3 You + I Kombucha - Lime Sea Salt 330ml 4 4 1.63 3.29 40 1.31 6.52
+YT2 Yogi Tea Bedtime Rooibos Vanilla 17bag 1 1 1.82 2.79 35 0.00 1.82
+YT27 Yogi Tea Alkaline Herbs 17bag 1 1 1.82 2.79 35 0.00 1.82
+YT-410004 Yogi Tea Classic Tea 17bag 1 1 1.82 2.79 35 0.00 1.82
+YT-450104 Yogi Tea Sweet Chai 17bag 1 1 1.82 2.79 35 0.00 1.82
+YT-480604 Yogi Tea Bedtime Tea 17bag 2 2 1.82 2.79 35 0.00 3.64
+YT-480704 Yogi Tea Detox Tea 17bag 1 1 1.82 2.79 35 0.00 1.82
+YT63 Yogi Tea Ashwagandha Bal Organic 17bag 2 2 1.82 2.79 35 0.00 3.64
+ZWR16 ZeroWater ZeroWater Replacement Filters 1 1 24.13 42.99 33 4.82 24.13
+3pack
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 15
+Beanfreaks Canton Beanfreaks Canton Invoice No. PSI-1885362
+Jeremie Bowles Jeremie Bowles Order No. SO-2379755
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Canton Canton
+Customer Order No. EPOS-244967
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+United Kingdom United Kingdom Your Reference 146|0025920 - ok CC
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+ZWR23 ZeroWater Culligan ZeroWater 2-pk Filter 1 1 16.84 29.99 33 3.37 16.84
+2pack
+ZYT1 Zaytoun Jericho's Finest Medjoul Dates 4 4 3.87 5.99 35 0.00 15.48
+250g
+Total GBP Excl. VAT 1,466.93
+VAT Amount 118.09
+Total GBP Incl. VAT 1,585.02
+No. of Items Ordered 686
+No. of Items Shipped 502
+VAT Amount Specification
+VAT Identifier VAT % Line Amount VAT Base VAT Amount
+S 20 590.49 590.49 118.09
+Z 0 876.44 876.44 0.00
+Total 1,466.93 1,466.93 118.09
+Payment Terms End of following Month following invoice date
+Account Name CLF Distribution Ltd
+Sort Code 40-61-35
+Account No. 03009714
+SWIFT Code HBUKGB4B
+IBAN GB20HBUK40613503009714
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973

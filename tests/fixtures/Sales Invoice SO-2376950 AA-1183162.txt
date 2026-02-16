@@ -1,0 +1,35 @@
+Sales - Invoice
+CLF Distribution
+210 Mauretania Road Phone No. (023) 8127 7000
+Nursling Industrial Estate Fax No. (023) 8127 7001
+Southampton VAT Reg. No. GB712190568
+Hampshire SO16 0YS AWRS URN XZAW00000106763
+Deliver To Invoice To Page 1
+Beanfreaks Ltd Beanfreaks Ltd Invoice No. PSI-1885357
+Jeremie Bowles Jeremie Bowles Order No. SO-2376950
+124 Cowbridge Road East 124 Cowbridge Road East
+Account No. CN-00003
+Cardiff, CF11 9DX Cardiff, CF11 9DX
+Customer Order No. AA-1183162
+United Kingdom United Kingdom
+Posting Date 03/02/26
+Ord Pick
+No. Description Qty Qty Reason Price Change RRP GP % VAT Amount
+BRY12 Berkeley Farm Dairy Organic Live Natural 6 6 1.79 2.39 25 0.00 10.74
+Yogurt 450g
+BRY21 Berkeley Farm Dairy Organic Natural 6 6 1.86 2.49 25 0.00 11.16
+Yogurt Drink 750ml
+BRY6 Berkeley Farm Dairy Organic Whole Milk 1 1 2.58 3.49 26 0.00 2.58
+2l
+Total GBP 24.48
+No. of Items Ordered 13
+No. of Items Shipped 13
+Payment Terms End of following Month following invoice date
+Account Name CLF Distribution Ltd
+Sort Code 40-61-35
+Account No. 03009714
+SWIFT Code HBUKGB4B
+IBAN GB20HBUK40613503009714
+SUP = Supplier out of stock | CLF = CLF out of stock | SD = Supplier Delay | NEW = New product | DIS = Discontinued product
+Registered Office: CLF Distribution, 210 Mauretania Road, Nursling Industrial Estate, Southampton, Hampshire. SO16 0YS
+Registered Company No: 356 1973
