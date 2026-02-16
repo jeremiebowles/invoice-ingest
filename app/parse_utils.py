@@ -62,3 +62,41 @@ def first_match(patterns: Iterable[str], text: str, flags: int = 0) -> Optional[
         if match:
             return match
     return None
+
+
+# ---------------------------------------------------------------------------
+# Shared postcode / ledger-account helpers
+# ---------------------------------------------------------------------------
+
+POSTCODE_RE = re.compile(
+    r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b",
+    re.IGNORECASE,
+)
+
+LEDGER_MAP: dict[str, int] = {
+    "CF10 1AE": 5001,
+    "CF24 3LP": 5002,
+    "CF11 9DX": 5004,
+}
+
+
+def normalize_postcode(raw: str) -> Optional[str]:
+    if not raw:
+        return None
+    raw = raw.strip().upper().replace(" ", "")
+    if len(raw) < 5:
+        return None
+    return f"{raw[:-3]} {raw[-3:]}"
+
+
+def extract_delivery_postcode(text: str) -> Optional[str]:
+    """Find a UK postcode in *text*, preferring known store postcodes."""
+    matches = POSTCODE_RE.findall(text or "")
+    normalized = [normalize_postcode(f"{m[0]}{m[1]}") for m in matches]
+    normalized = [pc for pc in normalized if pc is not None]
+    # Prefer a postcode that maps to a known store / ledger account
+    for pc in normalized:
+        if pc in LEDGER_MAP:
+            return pc
+    # Fall back to first postcode found
+    return normalized[0] if normalized else None

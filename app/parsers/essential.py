@@ -4,24 +4,10 @@ import re
 from typing import Optional
 
 from app.models import InvoiceData
-from app.parse_utils import approx_equal, first_match, parse_date, parse_money
+from app.parse_utils import approx_equal, first_match, parse_date, parse_money, extract_delivery_postcode, LEDGER_MAP
 
 
-_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
 _MONEY_RE = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[-+]?\d+(?:\.\d{2})")
-
-_LEDGER_MAP = {
-    "CF10 1AE": 5001,
-    "CF24 3LP": 5002,
-    "CF11 9DX": 5004,
-}
-
-
-def _normalize_postcode(raw: str) -> str:
-    raw = raw.strip().upper().replace(" ", "")
-    if len(raw) <= 3:
-        return raw
-    return f"{raw[:-3]} {raw[-3:]}"
 
 
 def _extract_invoice_number(text: str) -> str:
@@ -35,13 +21,6 @@ def _extract_invoice_date(text: str) -> Optional[str]:
     match = first_match([r"Invoice\s*Date\s*[:]?\s*([0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4})"], text, flags=re.IGNORECASE)
     if match:
         return match.group(match.lastindex)
-    return None
-
-
-def _extract_postcode(text: str) -> Optional[str]:
-    match = _POSTCODE_RE.search(text or "")
-    if match:
-        return _normalize_postcode(match.group(0))
     return None
 
 
@@ -111,8 +90,8 @@ def parse_essential(text: str) -> InvoiceData:
     if not invoice_date:
         raise ValueError("Essential invoice date not found")
 
-    postcode = _extract_postcode(text)
-    ledger_account = _LEDGER_MAP.get(postcode) if postcode else None
+    postcode = extract_delivery_postcode(text)
+    ledger_account = LEDGER_MAP.get(postcode) if postcode else None
 
     vat_net, nonvat_net, vat_amount = _extract_vat_analysis(text)
     order_net, order_vat, order_total = _extract_totals(text)

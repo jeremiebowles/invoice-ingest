@@ -5,27 +5,7 @@ from datetime import timedelta
 from typing import Optional
 
 from app.models import InvoiceData
-from app.parse_utils import parse_date, parse_money, approx_equal
-
-_POSTCODE_RE = re.compile(
-    r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*([0-9][A-Z]{2})\b",
-    re.IGNORECASE,
-)
-
-_LEDGER_MAP = {
-    "CF10 1AE": 5001,
-    "CF24 3LP": 5002,
-    "CF11 9DX": 5004,
-}
-
-
-def _normalize_postcode(raw: str) -> Optional[str]:
-    if not raw:
-        return None
-    raw = raw.strip().upper().replace(" ", "")
-    if len(raw) < 5:
-        return None
-    return f"{raw[:-3]} {raw[-3:]}"
+from app.parse_utils import parse_date, parse_money, approx_equal, extract_delivery_postcode, LEDGER_MAP
 
 
 def _extract_delivery_block(text: str) -> Optional[str]:
@@ -37,13 +17,6 @@ def _extract_delivery_block(text: str) -> Optional[str]:
     if match:
         return match.group(1).strip()
     return None
-
-
-def _extract_postcode(text: str) -> Optional[str]:
-    match = _POSTCODE_RE.search(text or "")
-    if not match:
-        return None
-    return _normalize_postcode(match.group(0))
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
@@ -138,8 +111,8 @@ def parse_viridian(text: str) -> InvoiceData:
     warnings: list[str] = []
 
     deliver_block = _extract_delivery_block(text or "")
-    postcode = _extract_postcode(deliver_block or "") or _extract_postcode(text or "")
-    ledger_account = _LEDGER_MAP.get(postcode) if postcode else None
+    postcode = extract_delivery_postcode(deliver_block or "") or extract_delivery_postcode(text or "")
+    ledger_account = LEDGER_MAP.get(postcode) if postcode else None
     if not postcode:
         warnings.append("Deliver To postcode not found")
     elif ledger_account is None:

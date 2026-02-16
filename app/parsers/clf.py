@@ -5,26 +5,12 @@ from datetime import timedelta
 from typing import Optional
 
 from app.models import InvoiceData
-from app.parse_utils import approx_equal, first_match, parse_date, parse_money
+from app.parse_utils import approx_equal, first_match, parse_date, parse_money, normalize_postcode, POSTCODE_RE, LEDGER_MAP
 
 
-_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"\b([0-9]{1,2}[\-/.][0-9]{1,2}[\-/.][0-9]{2,4})\b")
 _MONEY_CAPTURE_RE = re.compile(r"[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})|[-+]?\d+(?:\.\d{2})")
 _MONEY_ONLY_RE = re.compile(r"^[£$]?\s*[-+]?\d{1,3}(?:,\d{3})*(?:\.\d{2})\s*$")
-
-_LEDGER_MAP = {
-    "CF10 1AE": 5001,
-    "CF24 3LP": 5002,
-    "CF11 9DX": 5004,
-}
-
-
-def _normalize_postcode(raw: str) -> str:
-    raw = raw.strip().upper().replace(" ", "")
-    if len(raw) <= 3:
-        return raw
-    return f"{raw[:-3]} {raw[-3:]}"
 
 
 def _extract_deliver_to_block(text: str) -> Optional[str]:
@@ -125,19 +111,19 @@ def _extract_terms_days(text: str) -> Optional[int]:
 def _extract_postcode_from_lines(text: str) -> Optional[str]:
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     for idx, line in enumerate(lines):
-        if re.search(r"Deliver\\s*To", line, flags=re.IGNORECASE):
+        if re.search(r"Deliver\s*To", line, flags=re.IGNORECASE):
             for offset in range(0, 8):
                 if idx + offset >= len(lines):
                     break
-                match = _POSTCODE_RE.search(lines[idx + offset])
+                match = POSTCODE_RE.search(lines[idx + offset])
                 if match:
-                    return _normalize_postcode(match.group(0))
+                    return normalize_postcode(match.group(0))
     return None
 
 
 def _find_known_postcode(text: str) -> Optional[str]:
     normalized = re.sub(r"\s+", "", (text or "").upper())
-    for known in _LEDGER_MAP.keys():
+    for known in LEDGER_MAP.keys():
         if known.replace(" ", "") in normalized:
             return known
     return None
@@ -322,16 +308,16 @@ def parse_clf(text: str) -> InvoiceData:
     ledger_account = None
 
     if deliver_block:
-        postcode_match = _POSTCODE_RE.search(deliver_block)
+        postcode_match = POSTCODE_RE.search(deliver_block)
         if postcode_match:
-            postcode = _normalize_postcode(postcode_match.group(0))
+            postcode = normalize_postcode(postcode_match.group(0))
     if not postcode:
         postcode = _find_known_postcode(text or "")
     if not postcode:
         postcode = _extract_postcode_from_lines(text or "")
 
     if postcode:
-        ledger_account = _LEDGER_MAP.get(postcode)
+        ledger_account = LEDGER_MAP.get(postcode)
         if ledger_account is None:
             warnings.append(f"Unknown Deliver To postcode: {postcode}")
     else:
