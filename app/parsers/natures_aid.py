@@ -9,57 +9,53 @@ from app.parse_utils import parse_date, parse_money, approx_equal, extract_deliv
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    match = re.search(r"Invoice No\.\s*([A-Z0-9-]+)", text, flags=re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    """Match the S-INV-NN-NNNNNN format directly."""
+    match = re.search(r"(S-INV-\d{2}-\d{6})", text)
+    return match.group(1) if match else None
 
 
 def _extract_invoice_date(text: str) -> Optional[str]:
-    match = re.search(r"Invoice Date\s*([0-9]{2}/[0-9]{2}/[0-9]{4})", text, flags=re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    """Invoice date appears immediately before the S-INV number on the data line."""
+    match = re.search(r"(\d{2}/\d{2}/\d{4})\s+S-INV", text)
+    return match.group(1) if match else None
 
 
 def _extract_due_date(text: str) -> Optional[str]:
-    match = re.search(r"Payment Due By\s*([0-9]{2}/[0-9]{2}/[0-9]{4})", text, flags=re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    """Payment due date appears immediately before the S-SHPT number on the data line."""
+    match = re.search(r"(\d{2}/\d{2}/\d{4})\s+S-SHPT", text)
+    return match.group(1) if match else None
 
 
 def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
-    net_match = re.search(r"Net Total\s*£?([0-9.,]+)", text, flags=re.IGNORECASE)
-    vat_match = re.search(r"VAT\s*£?([0-9.,]+)", text, flags=re.IGNORECASE)
-    total_match = re.search(r"Total\s*£?([0-9.,]+)", text, flags=re.IGNORECASE)
+    net_match = re.search(r"Net Total\s*£?([\d.,]+)", text, re.IGNORECASE)
+    vat_match = re.search(r"^VAT\s*£?([\d.,]+)", text, re.IGNORECASE | re.MULTILINE)
+    # Exclude "Sub Total" and "Net Total" - match standalone "Total"
+    total_match = re.search(r"(?<!Sub )(?<!Net )Total\s*£?([\d.,]+)", text, re.IGNORECASE)
     net = parse_money(net_match.group(1)) if net_match else None
     vat = parse_money(vat_match.group(1)) if vat_match else None
     total = parse_money(total_match.group(1)) if total_match else None
     return net, vat, total
 
 
-def _extract_vat_split_from_lines(text: str) -> tuple[Optional[float], Optional[float]]:
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    in_lines = False
-    last_vat = None
+def _extract_vat_split(text: str) -> tuple[Optional[float], Optional[float]]:
+    """Split net amount into VAT-rated and zero-rated from line items.
+
+    Each line item ends with: ... %Disc VAT% NetAmount
+    e.g. '... 27.5 20 3.62' or '... 27.5 0 4.59'
+    """
     vat_net = 0.0
     nonvat_net = 0.0
     found = False
-    for line in lines:
-        lower = line.lower()
-        if lower == "vat %":
-            in_lines = True
+    for m in re.finditer(r"\b(0|20)\s+([\d.]+)\s*$", text, re.MULTILINE):
+        vat_pct = int(m.group(1))
+        amount = parse_money(m.group(2))
+        if amount is None:
             continue
-        if lower in {"sub total", "net total", "invoice discount", "net total"}:
-            break
-        if not in_lines:
-            continue
-        if re.fullmatch(r"(0|0\.0|0\.00|20|20\.0|20\.00)", line):
-            last_vat = float(line)
-            continue
-        amount = parse_money(line)
-        if amount is not None and last_vat is not None:
-            if last_vat == 0:
-                nonvat_net += amount
-            else:
-                vat_net += amount
-            last_vat = None
-            found = True
+        found = True
+        if vat_pct == 0:
+            nonvat_net += amount
+        else:
+            vat_net += amount
     if not found:
         return None, None
     return round(vat_net, 2), round(nonvat_net, 2)
@@ -88,7 +84,7 @@ def parse_natures_aid(text: str) -> InvoiceData:
         due_date = invoice_date + timedelta(days=30)
 
     vat_net, vat_amount, total = _extract_totals(text or "")
-    split_vat_net, split_nonvat_net = _extract_vat_split_from_lines(text or "")
+    split_vat_net, split_nonvat_net = _extract_vat_split(text or "")
     if vat_net is None:
         warnings.append("VAT net amount not found")
         vat_net = 0.0
