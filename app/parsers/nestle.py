@@ -8,80 +8,64 @@ from app.models import InvoiceData
 from app.parse_utils import parse_date, parse_money, approx_equal, extract_delivery_postcode, LEDGER_MAP
 
 
-def _strip_terms(text: str) -> str:
-    split = re.split(r"Terms\s*&?\s*Conditions", text, flags=re.IGNORECASE)
-    return split[0] if split else text
-
-
 def _extract_invoice_number(text: str) -> Optional[str]:
-    # Invoice number typically in a line below "INVOICE NO :"
-    match = re.search(r"INVOICE NO\s*:?\s*([0-9-]+)", text, flags=re.IGNORECASE)
-    if match:
-        return match.group(1).strip()
-    return None
+    """Extract 10-digit Nestle invoice number.
+
+    The header line reads:
+        TO AND INVOICE No. ON ALL 6873868 1337640820 379432906 ...
+    Numbers are: SHIP-TO (7 digits), INVOICE NO (10 digits), SALES ORDER (9 digits).
+    """
+    match = re.search(r"ON ALL\s+\d+\s+(\d{10})\b", text, re.IGNORECASE)
+    return match.group(1) if match else None
 
 
 def _extract_invoice_date(text: str) -> Optional[str]:
-    match = re.search(
-        r"INVOICE DATE:\s*\(TAXPOINT\)\s*([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})",
-        text,
-        flags=re.IGNORECASE,
-    )
-    if match:
-        return match.group(1).strip()
-    return None
+    """Extract invoice / taxpoint date.
+
+    pdfplumber puts the date on its own line below the header numbers:
+        ... HSBC Bank PLC.
+        20/11/2025
+    """
+    match = re.search(r"^\s*(\d{2}/\d{2}/\d{4})\s*$", text, re.MULTILINE)
+    return match.group(1).strip() if match else None
 
 
 def _extract_due_date(text: str) -> Optional[str]:
     match = re.search(
-        r"PAYMENT DUE DATE:\s*([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})",
+        r"PAYMENT DUE DATE:\s*(\d{1,2}/\d{1,2}/\d{4})",
         text,
         flags=re.IGNORECASE,
     )
-    if match:
-        return match.group(1).strip()
-    return None
+    return match.group(1).strip() if match else None
 
 
 def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    value_ex = []
-    vat_vals = []
-    total_vals = []
-    for i, line in enumerate(lines):
-        if line.lower() == "value excl vat":
-            for nxt in lines[i + 1 : i + 6]:
-                val = parse_money(nxt)
-                if val is not None:
-                    value_ex.append(val)
-        if line.lower() == "vat":
-            for nxt in lines[i + 1 : i + 6]:
-                val = parse_money(nxt)
-                if val is not None:
-                    vat_vals.append(val)
-        if line.lower() == "invoice total":
-            for nxt in lines[i + 1 : i + 6]:
-                val = parse_money(nxt)
-                if val is not None:
-                    total_vals.append(val)
-    net = value_ex[-1] if value_ex else None
-    vat = vat_vals[-1] if vat_vals else None
-    total = total_vals[-1] if total_vals else None
-    return net, vat, total
+    """Extract from the TOTALS summary line.
+
+    pdfplumber renders the summary as:
+        TOTALS 237.39 47.48 284.87
+    which is: Value Excl VAT, VAT, Invoice Total.
+    """
+    match = re.search(r"TOTALS\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)", text, re.IGNORECASE)
+    if match:
+        net = parse_money(match.group(1))
+        vat = parse_money(match.group(2))
+        total = parse_money(match.group(3))
+        return net, vat, total
+    return None, None, None
 
 
 def parse_nestle(text: str) -> InvoiceData:
     warnings: list[str] = []
-    text = _strip_terms(text or "")
 
-    postcode = extract_delivery_postcode(text)
+    postcode = extract_delivery_postcode(text or "")
     ledger_account = LEDGER_MAP.get(postcode) if postcode else None
     if not postcode:
         warnings.append("Deliver To postcode not found")
     elif ledger_account is None:
         warnings.append(f"Unknown Deliver To postcode: {postcode}")
 
-    invoice_number = _extract_invoice_number(text) or "UNKNOWN"
+    invoice_number = _extract_invoice_number(text or "") or "UNKNOWN"
     invoice_date_str = _extract_invoice_date(text or "")
     invoice_date = parse_date(invoice_date_str)
     if not invoice_date:
@@ -104,7 +88,6 @@ def parse_nestle(text: str) -> InvoiceData:
         total = round(vat_net + vat_amount, 2)
         warnings.append("Total amount not found")
 
-    # Rare zero VAT line: we assume zero-rated net = total - vat_net - vat_amount
     nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
 
     if not approx_equal(vat_net + nonvat_net + vat_amount, total):
