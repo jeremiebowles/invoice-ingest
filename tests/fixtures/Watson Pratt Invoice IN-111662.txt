@@ -1,0 +1,56 @@
+TAX INVOICE Invoice Date
+19 Nov 2025
+BEANFREAKS CANTON Account Number
+Attention: Jeremy BEANCAN
+124 Cowbridge Road East
+Cardiff Invoice Number
+CF11 9DX IN-111662
+UNITED KINGDOM
+Reference
+VAT Number
+125201466
+Description Quantity Unit Price VAT Amount GBP
+*Delivery Charge 1.00 2.50 20% 2.50
+Apples Gala FR per kg- 14no 1.72 2.72 Zero Rated 4.68
+Avocado Bacon SP per kg- 10no 1.38 3.75 Zero Rated 5.18
+Bananas PE/DR per kg 7.10 1.71 Zero Rated 12.14
+Beetroot Cooked SP each 3.00 2.00 Zero Rated 6.00
+Beetroot UK per kg- 4no 0.79 1.50 Zero Rated 1.19
+Blueberries 125g AR each 1.00 2.29 Zero Rated 2.29
+Carrots Washed UK/HL per kg 0.46 1.65 Zero Rated 0.76
+Cavelo Nero 300g UK each 1.00 1.50 Zero Rated 1.50
+Celery HL each 4.00 2.08 Zero Rated 8.32
+Garlic SP per kg- 15no 0.93 8.25 Zero Rated 7.67
+Ginger PE/CN per kg 3.50 5.85 Zero Rated 20.48
+Kale UK 300g each 2.00 1.50 Zero Rated 3.00
+Kiwi Gold IT per kg- 6no 0.50 5.17 Zero Rated 2.59
+Lemons SP per kg- 21no 2.55 3.33 Zero Rated 8.49
+Lettuce Green Oak FR each 1.00 1.58 Zero Rated 1.58
+Onions Brown *UK* per kg- 6no small 0.375 1.95 Zero Rated 0.73
+Oranges SP per kg- 6no 1.56 2.30 Zero Rated 3.59
+Pears Conference UK per kg- 12no 1.77 3.33 Zero Rated 5.89
+Pomegranate Mollar SP each 1.00 1.30 Zero Rated 1.30
+Potatoes Orla UK per kg 0.91 1.32 Zero Rated 1.20
+Purple Sprouting Broccoli UK per kg 0.445 5.50 Zero Rated 2.45
+Salad Pack 100g UK each 3.00 1.60 Zero Rated 4.80
+Spinach 200g UK each 11.00 1.50 Zero Rated 16.50
+Squash Butternut (800g-1200g) SP/UK
+1.47 2.30 Zero Rated 3.38
+per kg- 2no
+Sweet Potatoes SP per kg- 10no small 2.44 2.33 Zero Rated 5.69
+Description Quantity Unit Price VAT Amount GBP
+Tomatoes Mini Plum Loose UK per kg 0.61 7.50 Zero Rated 4.58
+Turmeric PE per kg 1.50 10.00 Zero Rated 15.00
+Ystwyth Eggs UK per box (6) 26.00 2.35 Zero Rated 61.10
+Subtotal 214.58
+Total VAT 20% 0.50
+Total Zero Rated 0.00
+Invoice Total GBP 215.08
+Total Net Payments GBP 0.00
+Amount Due GBP 215.08
+Due Date: 17 Dec 2025
+All produce is organic (class II), supplied to current EU organic standards. Any producs marked “in conversion” are products in
+conversion to organic farming.
+Organic Certificates are available upon request.
+All fruit & veg should be washed prior to use. Please contact us for any allergen advice
+OUR BANK DETAILS ARE- Monzo Account Name: BPLW Ltd Sort Code: 04-00-03 Account: 87618499

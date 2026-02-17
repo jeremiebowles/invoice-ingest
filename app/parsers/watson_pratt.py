@@ -9,7 +9,10 @@ from app.parse_utils import parse_date, parse_money, approx_equal, extract_deliv
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    match = re.search(r"Invoice Number\s*([A-Z0-9-]+)", text, flags=re.IGNORECASE)
+    # Watson & Pratt invoice numbers are IN-NNNNNN format.
+    # Generic [A-Z0-9-]+ after "Invoice Number" grabs the postcode (CF11)
+    # from the merged two-column layout, so match the specific format.
+    match = re.search(r"(IN-\d+)", text)
     return match.group(1).strip() if match else None
 
 
@@ -38,10 +41,20 @@ def _extract_total(text: str) -> Optional[float]:
     return parse_money(match.group(1)) if match else None
 
 
-def _detect_delivery_vat_net(text: str) -> Optional[float]:
-    if re.search(r"\\*Delivery Charge", text, flags=re.IGNORECASE):
-        return 2.00
-    return None
+def _extract_vat_net(text: str) -> float:
+    """Sum all 20%-rated line item amounts (typically just delivery charge).
+
+    Line format: '*Delivery Charge 1.00 2.50 20% 2.50'
+    We match '20% <amount>' in the line-items section (before Subtotal).
+    """
+    parts = re.split(r"Subtotal", text, flags=re.IGNORECASE)
+    items_text = parts[0] if parts else text
+    total = 0.0
+    for m in re.finditer(r"20%\s+([\d.,]+)", items_text):
+        val = parse_money(m.group(1))
+        if val is not None:
+            total += val
+    return round(total, 2)
 
 
 def parse_watson_pratt(text: str) -> InvoiceData:
@@ -80,11 +93,7 @@ def parse_watson_pratt(text: str) -> InvoiceData:
         total = round(subtotal + vat_amount, 2)
         warnings.append("Total amount not found")
 
-    delivery_vat_net = _detect_delivery_vat_net(text or "")
-    if delivery_vat_net is None:
-        delivery_vat_net = round(vat_amount / 0.20, 2) if vat_amount else 0.0
-
-    vat_net = round(delivery_vat_net, 2)
+    vat_net = _extract_vat_net(text or "")
     nonvat_net = round(max(subtotal - vat_net, 0.0), 2)
 
     if not approx_equal(vat_net + nonvat_net + vat_amount, total):
