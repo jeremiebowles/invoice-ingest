@@ -1,0 +1,27 @@
+Invoice
+Invoice no IN06254
+Invoice date 19/Sep/2025
+Tonyrefail Apiary
+Due date 12/Oct/2025
+Item Pure Welsh Honey
+tonyrefailapiary@googlemail.com
+Order number N/A
+Twin Oaks
+Penrhiwfer Road Tonyrefail CF398EY
+07462729045
+Invoice to
+Beanfreaks Canton
+124 Cowbridge Rd E, Pontcanna,
+Cardiff CF11 9DX
+Item Lot no Rate Qty Amount
+Pure Welsh Clear 37925 - 37964 3.30 40 £132.00
+Honey 227g
+Total £132.00
+Payment methods
+£0.00
+Paid
+Tonyrefail Apiary Lloyds bank plc
+Balance due £132.00
+Sort code: 30-96-72 Account no: 01088958
+The above remains the property of Tonyrefail Apiary until payment received in full. Please make any
+cheque payable to Tonyrefail Apiary.
