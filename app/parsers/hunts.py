@@ -5,47 +5,76 @@ from datetime import timedelta
 from typing import Optional
 
 from app.models import InvoiceData
-from app.parse_utils import parse_date, parse_money, approx_equal, extract_delivery_postcode, LEDGER_MAP
+from app.parse_utils import parse_date, parse_money, approx_equal, extract_delivery_postcode, LEDGER_MAP, POSTCODE_RE, normalize_postcode
 
 
-def _extract_deliver_block(text: str) -> Optional[str]:
-    match = re.search(
-        r"Deliver To\s*(.+?)\s*INVOICE",
-        text,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    if match:
-        return match.group(1).strip()
-    return None
+def _extract_delivery_postcode_hunts(text: str) -> Optional[str]:
+    """Extract delivery postcode from Hunts two-column header layout.
+
+    pdfplumber merges left (Invoice To) and right (Deliver To) columns onto
+    the same line, so the delivery postcode (right column) appears AFTER the
+    billing postcode on the same line.  We grab the last known-store postcode
+    in the header section.
+    """
+    header_match = re.search(r"Deliver To(.+?)Code\s+Description", text, re.IGNORECASE | re.DOTALL)
+    header = header_match.group(1) if header_match else text
+
+    matches = POSTCODE_RE.findall(header)
+    normalized = [normalize_postcode(f"{m[0]}{m[1]}") for m in matches]
+    normalized = [pc for pc in normalized if pc is not None]
+
+    # Prefer the last LEDGER_MAP postcode (rightmost column = delivery)
+    known = [pc for pc in normalized if pc in LEDGER_MAP]
+    if known:
+        return known[-1]
+    return normalized[-1] if normalized else None
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    match = re.search(r"INVOICE\s*([0-9-]+)", text, flags=re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    """Extract Hunts invoice number in format 510-NNNNNN."""
+    match = re.search(r"\b(\d{3}-\d{6})\b", text)
+    return match.group(1) if match else None
 
 
 def _extract_tax_point_date(text: str) -> Optional[str]:
+    """Extract Tax Point Date from Hunts header.
+
+    pdfplumber often renders the label with internal spaces
+    (e.g. "Ta x Po in t D at e"), so we fall back to finding the first
+    date pattern in the header area (before line items).
+    """
+    # Try the clean label first
     match = re.search(
-        r"Tax Point Date\s*([0-9]{1,2}\s*/\s*[0-9]{1,2}\s*/\s*[0-9]{2,4})",
+        r"Tax Point Date\s*(\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{2,4})",
         text,
         flags=re.IGNORECASE,
     )
     if match:
         return match.group(1).replace(" ", "")
-    return None
 
+    # Fallback: first date in the header section (before line items)
+    header_match = re.search(r"(.+?)Code\s+Description", text, re.DOTALL | re.IGNORECASE)
+    header = header_match.group(1) if header_match else text[:500]
 
-def _value_after_label(lines: list[str], label: str) -> Optional[float]:
-    for i, line in enumerate(lines):
-        if line.strip().lower() == label.lower():
-            for nxt in lines[i + 1 : i + 6]:
-                val = parse_money(nxt.strip())
-                if val is not None:
-                    return val
+    dates = re.findall(r"(\d{1,2}/\s*\d{1,2}/\s*\d{2,4})", header)
+    if dates:
+        return dates[0].replace(" ", "")
     return None
 
 
 def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """Parse Hunts VAT Analysis table.
+
+    pdfplumber renders numbered rate lines like:
+        1 ZERO 148.22 0.00
+        2 20.00% 115.20 23.04
+    And summary values like:
+        263.42 Ex VAT
+        23.04  (VAT total)
+        286.46 (Total amount)
+    """
+    # Find the LAST "VAT Analysis" section (multi-page invoices repeat a
+    # "Continued" placeholder on earlier pages; the real data is on the last page)
     start = None
     for m in re.finditer(r"VAT Analysis", text, flags=re.IGNORECASE):
         start = m.start()
@@ -57,60 +86,61 @@ def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], 
     section = tail[: end_match.start()] if end_match else tail
 
     lines = [line.strip() for line in section.splitlines() if line.strip()]
-    rates: list[str] = []
-    values: list[float] = []
-    vats: list[float] = []
-    state = None
-    for line in lines:
-        if line.lower() == "vat rate":
-            state = "rates"
-            continue
-        if line.lower() == "value":
-            state = "values"
-            continue
-        if line.lower() == "vat":
-            state = "vat"
-            continue
-        if re.search(r"^total$|^ex vat$|^amount$", line, flags=re.IGNORECASE):
-            state = None
-            continue
-        if state == "rates" and ( "zero" in line.lower() or "%" in line):
-            rates.append(line)
-        elif state == "values":
-            val = parse_money(line)
-            if val is not None:
-                values.append(val)
-        elif state == "vat":
-            val = parse_money(line)
-            if val is not None:
-                vats.append(val)
 
     vat_net = 0.0
     nonvat_net = 0.0
-    for idx, val in enumerate(values):
-        rate = rates[idx] if idx < len(rates) else ""
-        if "zero" in rate.lower() or "0.00" in rate:
-            nonvat_net += val
-        else:
-            vat_net += val
+    vat_amount = 0.0
+    found_rates = False
 
-    vat_amount = sum(vats) if vats else None
+    # Parse numbered rate lines: "1 ZERO 148.22 0.00" or "2 20.00% 115.20 23.04"
+    for line in lines:
+        m = re.match(r"^\d+\s+(ZERO|[\d.]+%)\s+([\d.,]+)\s+([\d.,]+)", line, re.IGNORECASE)
+        if m:
+            rate_str = m.group(1)
+            net_val = parse_money(m.group(2))
+            vat_val = parse_money(m.group(3))
+            if net_val is None:
+                continue
+            found_rates = True
+            if rate_str.upper() == "ZERO" or rate_str == "0.00%":
+                nonvat_net += net_val
+            else:
+                vat_net += net_val
+            if vat_val is not None:
+                vat_amount += vat_val
 
-    total = _value_after_label(lines, "Amount")
-    if total is None:
-        total = _value_after_label(lines, "Total Amount")
-    if total is None:
-        total = _value_after_label(lines, "Total")
+    if not found_rates:
+        return None, None, None, None
 
-    return round(vat_net, 2), round(nonvat_net, 2), (round(vat_amount, 2) if vat_amount is not None else None), total
+    # Extract total from the summary area
+    # Look for a number on a line by itself or before "Amount", after the rate lines
+    total = None
+    # Pattern: number followed by "Amount" or at end of section near account number
+    for line in lines:
+        # Match total line: "02920 494902 286.46" or just "286.46" near end
+        # The total appears on the line with the account number
+        m = re.match(r"^\d{5}\s+\d{6}\s+([\d.,]+)$", line)
+        if m:
+            val = parse_money(m.group(1))
+            if val is not None:
+                total = val
+
+    # Also try "Ex VAT" line for the ex-vat total as cross-check
+    # e.g. "263.42 Ex VAT" or "V AT R at e Va l ue V AT 263.42 Ex VAT"
+    ex_vat_match = re.search(r"([\d.,]+)\s+Ex\s*VAT", section, re.IGNORECASE)
+    if total is None and ex_vat_match:
+        ex_vat = parse_money(ex_vat_match.group(1))
+        if ex_vat is not None:
+            total = round(ex_vat + vat_amount, 2)
+
+    return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2), total
 
 
 def _parse_section(text: str) -> InvoiceData:
     warnings: list[str] = []
     is_credit = bool(re.search(r"Credit\s*(Memo|Note)", text or "", flags=re.IGNORECASE))
 
-    deliver_block = _extract_deliver_block(text or "")
-    postcode = extract_delivery_postcode(deliver_block or "") or extract_delivery_postcode(text or "")
+    postcode = _extract_delivery_postcode_hunts(text or "")
     ledger_account = LEDGER_MAP.get(postcode) if postcode else None
     if not postcode:
         warnings.append("Deliver To postcode not found")
@@ -161,14 +191,27 @@ def _parse_section(text: str) -> InvoiceData:
 def parse_hunts(text: str) -> list[InvoiceData]:
     if not text:
         return []
-    normalized = text.replace("Hunt’s", "Hunt's")
+    normalized = text.replace("\u2019", "'")
+    # Split on "Hunt's Food Group Ltd" header (page boundaries)
     starts = [m.start() for m in re.finditer(r"Hunt's Food Group Ltd", normalized)]
     if not starts:
         return [_parse_section(normalized)]
-    sections: list[str] = []
+
+    # Build per-page sections
+    pages: list[str] = []
     for i, start in enumerate(starts):
         end = starts[i + 1] if i + 1 < len(starts) else len(normalized)
-        section = normalized[start:end].strip()
-        if section:
-            sections.append(section)
+        page = normalized[start:end].strip()
+        if page:
+            pages.append(page)
+
+    # Merge multi-page invoices: if "N of M" where N > 1, it's a continuation
+    sections: list[str] = []
+    for page in pages:
+        page_match = re.search(r"\b(\d+)\s+of\s+(\d+)\b", page)
+        if page_match and int(page_match.group(1)) > 1 and sections:
+            sections[-1] = sections[-1] + "\n" + page
+        else:
+            sections.append(page)
+
     return [_parse_section(section) for section in sections]
