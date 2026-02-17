@@ -19,22 +19,18 @@ def _extract_invoice_date(text: str) -> Optional[str]:
 
 
 def _extract_zero_and_standard_nets(text: str) -> tuple[Optional[float], Optional[float]]:
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     zero_net = None
     standard_net = None
-    for idx, line in enumerate(lines):
-        if line.lower() == "zero rated":
-            for nxt in lines[idx + 1 : idx + 4]:
-                val = parse_money(nxt)
-                if val is not None:
-                    zero_net = val
-                    break
-        if line == "20%":
-            for nxt in lines[idx + 1 : idx + 4]:
-                val = parse_money(nxt)
-                if val is not None:
-                    standard_net = val
-                    break
+    # "Zero Rated 6.55" or "Zero Rated\n6.55"
+    m = re.search(r"Zero\s+Rated\s+([\d.,]+)", text, re.IGNORECASE)
+    if m:
+        zero_net = parse_money(m.group(1))
+    # "20% 161.74" in the VAT NET summary (not the line-item VAT Rate column)
+    # Look for "20%" followed by a number in the VAT NET block
+    for m in re.finditer(r"^20%\s+([\d.,]+)", text, re.MULTILINE):
+        val = parse_money(m.group(1))
+        if val is not None:
+            standard_net = val
     return zero_net, standard_net
 
 
@@ -42,26 +38,15 @@ def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Option
     sub_total = None
     vat_amount = None
     total = None
-    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    for idx, line in enumerate(lines):
-        if line.lower() == "sub total:":
-            for nxt in lines[idx + 1 : idx + 4]:
-                val = parse_money(nxt)
-                if val is not None:
-                    sub_total = val
-                    break
-        if line.lower() == "vat:":
-            for nxt in lines[idx + 1 : idx + 4]:
-                val = parse_money(nxt)
-                if val is not None:
-                    vat_amount = val
-                    break
-        if line.lower() == "total:":
-            for nxt in lines[idx + 1 : idx + 4]:
-                val = parse_money(nxt)
-                if val is not None:
-                    total = val
-                    break
+    m = re.search(r"Sub\s*Total:\s*([\d.,]+)", text, re.IGNORECASE)
+    if m:
+        sub_total = parse_money(m.group(1))
+    m = re.search(r"(?<!\w)VAT:\s*([\d.,]+)", text, re.IGNORECASE)
+    if m:
+        vat_amount = parse_money(m.group(1))
+    m = re.search(r"(?<!Sub )Total:\s*([\d.,]+)", text, re.IGNORECASE)
+    if m:
+        total = parse_money(m.group(1))
     return sub_total, vat_amount, total
 
 
