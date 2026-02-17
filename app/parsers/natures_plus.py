@@ -8,6 +8,22 @@ from app.models import InvoiceData
 from app.parse_utils import parse_date, parse_money, approx_equal, extract_delivery_postcode, LEDGER_MAP
 
 
+def _extract_ship_to_postcode(text: str) -> Optional[str]:
+    """Extract postcode from Ship To block, not Bill To.
+
+    The invoice has both Bill To (CF10 1AE) and Ship To (CF24 3LP) addresses.
+    extract_delivery_postcode picks the first LEDGER_MAP match (Bill To),
+    so we extract the Ship To section explicitly.
+    """
+    match = re.search(r"Ship To(.+?)(?:Invoice Details|Item\s+Material)", text, re.IGNORECASE | re.DOTALL)
+    if match:
+        ship_block = match.group(1)
+        pc = extract_delivery_postcode(ship_block)
+        if pc:
+            return pc
+    return extract_delivery_postcode(text or "")
+
+
 def _extract_invoice_number(text: str) -> Optional[str]:
     match = re.search(r"Invoice Number\s*([0-9-]+)", text, flags=re.IGNORECASE)
     return match.group(1).strip() if match else None
@@ -35,7 +51,7 @@ def _extract_totals(text: str) -> tuple[Optional[float], Optional[float], Option
 def parse_natures_plus(text: str) -> InvoiceData:
     warnings: list[str] = []
 
-    postcode = extract_delivery_postcode(text or "")
+    postcode = _extract_ship_to_postcode(text or "")
     ledger_account = LEDGER_MAP.get(postcode) if postcode else None
     if not postcode:
         warnings.append("Deliver To postcode not found")
