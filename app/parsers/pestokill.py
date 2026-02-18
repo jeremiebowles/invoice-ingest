@@ -7,7 +7,9 @@ from typing import Optional
 from app.models import InvoiceData
 from app.parse_utils import approx_equal, parse_date, parse_money, extract_delivery_postcode, LEDGER_MAP
 
-# Maps keywords in Customer Ref to known store postcodes
+_PESTOKILL_LEDGER = 7801
+
+# Maps keywords in Customer Ref to known store postcodes (for deliver_to_postcode only)
 _CUSTOMER_REF_POSTCODE: list[tuple[str, str]] = [
     ("royal arcade", "CF10 1AE"),
     ("canton", "CF11 9DX"),
@@ -65,11 +67,7 @@ def parse_pestokill(text: str) -> InvoiceData:
     if not postcode:
         postcode = extract_delivery_postcode(text or "")
 
-    ledger_account = LEDGER_MAP.get(postcode) if postcode else None
-    if not postcode:
-        warnings.append("Store not identified from Customer Ref or postcode")
-    elif ledger_account is None:
-        warnings.append(f"Unknown postcode: {postcode}")
+    ledger_account = _PESTOKILL_LEDGER
 
     invoice_number = _extract_invoice_number(text or "") or "UNKNOWN"
     invoice_date_str = _extract_invoice_date(text or "")
