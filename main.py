@@ -1536,17 +1536,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
     if FIRESTORE_ENABLED and message_id:
         try:
-            status = "parsed"
+            msg_status = "parsed"
             if SAGE_ENABLED and sage_results:
                 if any(isinstance(r, dict) and r.get("status") == "error" for r in sage_results):
-                    status = "error"
+                    msg_status = "error"
                 elif any(isinstance(r, dict) and r.get("status") == "skipped" for r in sage_results) and not any(
                     isinstance(r, dict) and r.get("id") for r in sage_results
                 ):
-                    status = "skipped"
+                    msg_status = "skipped"
                 elif any(isinstance(r, dict) and r.get("id") for r in sage_results):
-                    status = "posted"
-            update_message_status(str(message_id), {"status": status, "record_id": record_ids})
+                    msg_status = "posted"
+            update_message_status(str(message_id), {"status": msg_status, "record_id": record_ids})
         except Exception:
             logger.exception("Failed to update message_id status")
 
