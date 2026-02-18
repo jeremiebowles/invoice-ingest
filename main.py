@@ -36,6 +36,7 @@ from app.parsers.clf import parse_clf
 from app.parsers.viridian import parse_viridian
 from app.parsers.hunts import parse_hunts
 from app.parsers.absolute_aromas import parse_absolute_aromas
+from app.parsers.pestokill import parse_pestokill
 from app.parsers.avogel import parse_avogel
 from app.parsers.emporio import parse_emporio
 from app.parsers.watson_pratt import parse_watson_pratt
@@ -499,6 +500,15 @@ def _text_looks_like_avogel(text: str) -> bool:
         or "vat no. 454 9330 37" in normalized
         or "vat no: 454 9330 37" in normalized
         or "sales i n voice" in normalized
+    )
+
+
+def _text_looks_like_pestokill(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "pestokill" in normalized
+        or "horizon environment services" in normalized
+        or "437 6371 34" in normalized
     )
 
 
@@ -1398,6 +1408,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         invoices = [parse_avogel(text)]
     elif _text_looks_like_emporio(text):
         invoices = [parse_emporio(text)]
+    elif _text_looks_like_pestokill(text):
+        invoices = [parse_pestokill(text)]
     elif _text_looks_like_absolute_aromas(text):
         invoices = [parse_absolute_aromas(text)]
     else:
