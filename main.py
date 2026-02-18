@@ -1354,6 +1354,14 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                 sender_email,
             )
         invoices = [parse_essential(text)]
+    elif is_clf_sender or _text_looks_like_clf(text):
+        if not is_clf_sender:
+            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
+        invoices = [parse_clf(text)]
+    elif is_viridian_sender or _text_looks_like_viridian(text):
+        if not is_viridian_sender:
+            logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
+        invoices = [parse_viridian(text)]
     elif _text_looks_like_watson_pratt(text):
         invoices = [parse_watson_pratt(text)]
     elif _text_looks_like_nestle(text):
@@ -1368,14 +1376,6 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         invoices = [parse_tonyrefail(text)]
     elif _text_looks_like_avogel(text):
         invoices = [parse_avogel(text)]
-    elif is_viridian_sender or _text_looks_like_viridian(text):
-        if not is_viridian_sender:
-            logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
-        invoices = [parse_viridian(text)]
-    elif is_clf_sender or _text_looks_like_clf(text):
-        if not is_clf_sender:
-            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
-        invoices = [parse_clf(text)]
     else:
         logger.warning("No supplier parser matched; refusing to default to CLF", extra={"sender": sender_email})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
