@@ -5,7 +5,9 @@ from datetime import timedelta
 from typing import Optional
 
 from app.models import InvoiceData
-from app.parse_utils import approx_equal, parse_date, parse_money, extract_delivery_postcode, LEDGER_MAP
+from app.parse_utils import approx_equal, parse_date, parse_money, extract_delivery_postcode
+
+_EMPORIO_LEDGER = 7127
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
@@ -38,11 +40,7 @@ def parse_emporio(text: str) -> InvoiceData:
     warnings: list[str] = []
 
     postcode = extract_delivery_postcode(text or "")
-    ledger_account = LEDGER_MAP.get(postcode) if postcode else None
-    if not postcode:
-        warnings.append("Postcode not found")
-    elif ledger_account is None:
-        warnings.append(f"Unknown postcode: {postcode}")
+    ledger_account = _EMPORIO_LEDGER
 
     invoice_number = _extract_invoice_number(text or "") or "UNKNOWN"
     invoice_date_str = _extract_invoice_date(text or "")

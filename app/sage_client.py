@@ -224,6 +224,8 @@ def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
         return _get_env("SAGE_LEDGER_5002_ID")
     if invoice.ledger_account == 5004:
         return _get_env("SAGE_LEDGER_5004_ID")
+    if invoice.ledger_account == 7127:
+        return _get_env("SAGE_LEDGER_7127_ID")
     return None
 
 
