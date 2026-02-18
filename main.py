@@ -35,6 +35,7 @@ from app.models import InvoiceData
 from app.parsers.clf import parse_clf
 from app.parsers.viridian import parse_viridian
 from app.parsers.hunts import parse_hunts
+from app.parsers.absolute_aromas import parse_absolute_aromas
 from app.parsers.avogel import parse_avogel
 from app.parsers.emporio import parse_emporio
 from app.parsers.watson_pratt import parse_watson_pratt
@@ -498,6 +499,15 @@ def _text_looks_like_avogel(text: str) -> bool:
         or "vat no. 454 9330 37" in normalized
         or "vat no: 454 9330 37" in normalized
         or "sales i n voice" in normalized
+    )
+
+
+def _text_looks_like_absolute_aromas(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "absolute aromas" in normalized
+        or "absolute-aromas.com" in normalized
+        or "278 1735 71" in normalized
     )
 
 
@@ -1388,6 +1398,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         invoices = [parse_avogel(text)]
     elif _text_looks_like_emporio(text):
         invoices = [parse_emporio(text)]
+    elif _text_looks_like_absolute_aromas(text):
+        invoices = [parse_absolute_aromas(text)]
     else:
         logger.warning("No supplier parser matched; refusing to default to CLF", extra={"sender": sender_email})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
