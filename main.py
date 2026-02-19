@@ -536,7 +536,7 @@ def _text_looks_like_watson_pratt(text: str) -> bool:
         "tax invoice" in normalized
         and "invoice number" in normalized
         and "amount gbp" in normalized
-        and "vat number 125201466" in normalized
+        and bool(re.search(r"vat number\s+125201466", normalized))
     )
 
 
