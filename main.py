@@ -540,6 +540,10 @@ def _text_looks_like_watson_pratt(text: str) -> bool:
     )
 
 
+def _filename_looks_like_watson_pratt(name: str) -> bool:
+    return bool(re.search(r"\bIN-\d+\b", name or "", re.IGNORECASE))
+
+
 def _text_looks_like_nestle(text: str) -> bool:
     normalized = (text or "").lower()
     return (
@@ -1392,7 +1396,14 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         if not is_viridian_sender:
             logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
         invoices = [parse_viridian(text)]
-    elif _text_looks_like_watson_pratt(text):
+    elif _text_looks_like_watson_pratt(text) or _filename_looks_like_watson_pratt(
+        pdf_attachment.get("Name") or ""
+    ):
+        if not _text_looks_like_watson_pratt(text):
+            logger.info(
+                "Text did not match Watson & Pratt heuristics; matched by filename: %s",
+                pdf_attachment.get("Name"),
+            )
         invoices = [parse_watson_pratt(text)]
     elif _text_looks_like_nestle(text):
         invoices = [parse_nestle(text)]
