@@ -48,6 +48,7 @@ from app.parsers.tonyrefail import parse_tonyrefail
 from app.parsers.essential import parse_essential
 from app.parsers.lewtress import parse_lewtress
 from app.parsers.biocare import parse_biocare
+from app.parsers.kinetic import parse_kinetic
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_pdf
@@ -528,6 +529,14 @@ def _text_looks_like_biocare(text: str) -> bool:
         "biocare limited" in normalized
         or "biocare.co.uk" in normalized
         or "249786641" in normalized
+    )
+
+
+def _text_looks_like_kinetic(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "kinetic enterprises" in normalized
+        or "6058949" in normalized
     )
 
 
@@ -1446,6 +1455,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         invoices = [parse_lewtress(text)]
     elif _text_looks_like_biocare(text):
         invoices = [parse_biocare(text)]
+    elif _text_looks_like_kinetic(text):
+        invoices = [parse_kinetic(text)]
     else:
         logger.warning("No supplier parser matched; refusing to default to CLF", extra={"sender": sender_email})
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
