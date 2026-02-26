@@ -96,8 +96,21 @@ def parse_natures_aid(text: str) -> InvoiceData:
         warnings.append("Total amount not found")
 
     if split_vat_net is not None and split_nonvat_net is not None:
-        vat_net = split_vat_net
-        nonvat_net = split_nonvat_net
+        split_total = round(split_vat_net + split_nonvat_net, 2)
+        if vat_net is not None and not approx_equal(split_total, vat_net):
+            # Line item values are pre-discount; use Net Total as authoritative
+            # and apply split ratio to determine VAT vs zero-rated breakdown.
+            net_total = vat_net
+            if split_total > 0:
+                vat_ratio = split_vat_net / split_total
+                vat_net = round(net_total * vat_ratio, 2)
+                nonvat_net = round(net_total - vat_net, 2)
+            else:
+                vat_net = net_total
+                nonvat_net = 0.0
+        else:
+            vat_net = split_vat_net
+            nonvat_net = split_nonvat_net
     else:
         nonvat_net = round(max(total - vat_net - vat_amount, 0.0), 2)
 
