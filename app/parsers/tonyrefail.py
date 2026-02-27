@@ -9,12 +9,15 @@ from app.parse_utils import parse_date, parse_money, approx_equal, extract_deliv
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    match = re.search(r"Invoice\s+no\s*([A-Z0-9-]+)", text, flags=re.IGNORECASE)
+    # OCR splits label from value across lines; match the IN-prefixed number directly.
+    match = re.search(r"\b(IN\d{4,10})\b", text or "")
     return match.group(1).strip() if match else None
 
 
 def _extract_invoice_date(text: str) -> Optional[str]:
-    match = re.search(r"Invoice date\s*([0-9]{1,2}/[A-Za-z]{3}/[0-9]{4})", text, flags=re.IGNORECASE)
+    # OCR column-reads the table so label and value are not adjacent.
+    # The DD/Mon/YYYY format is distinctive enough to match anywhere.
+    match = re.search(r"\b(\d{1,2}/[A-Za-z]{3}/\d{4})\b", text or "")
     return match.group(1).strip() if match else None
 
 
@@ -24,7 +27,10 @@ def _extract_due_date(text: str) -> Optional[str]:
 
 
 def _extract_total(text: str) -> Optional[float]:
-    match = re.search(r"Total\s*£?\s*([0-9.,]+)", text, flags=re.IGNORECASE)
+    # "Balance due £468.00" is the primary pattern; fall back to generic "Total £..."
+    match = re.search(r"Balance due\s*£?\s*([0-9.,]+)", text, flags=re.IGNORECASE)
+    if not match:
+        match = re.search(r"(?<!Sub )Total\s*£?\s*([0-9.,]+)", text, flags=re.IGNORECASE)
     return parse_money(match.group(1)) if match else None
 
 
