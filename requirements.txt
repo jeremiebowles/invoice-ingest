@@ -6,3 +6,4 @@ uvicorn[standard]==0.30.6
 requests==2.32.3
 google-cloud-firestore==2.16.0
 google-cloud-secret-manager==2.20.0
+google-cloud-vision==3.8.0

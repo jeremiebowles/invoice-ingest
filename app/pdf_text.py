@@ -5,6 +5,18 @@ from io import BytesIO
 import pdfplumber
 
 
+def extract_text_from_image(image_bytes: bytes) -> str:
+    """Extract text from an image using Google Cloud Vision document_text_detection."""
+    from google.cloud import vision  # type: ignore[import]
+
+    client = vision.ImageAnnotatorClient()
+    image = vision.Image(content=image_bytes)
+    response = client.document_text_detection(image=image)
+    if response.error.message:
+        raise RuntimeError(f"Cloud Vision error: {response.error.message}")
+    return response.full_text_annotation.text or ""
+
+
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     if not pdf_bytes:
         return ""

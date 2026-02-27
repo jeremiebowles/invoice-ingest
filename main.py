@@ -51,7 +51,7 @@ from app.parsers.biocare import parse_biocare
 from app.parsers.kinetic import parse_kinetic
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
-from app.pdf_text import extract_text_from_pdf
+from app.pdf_text import extract_text_from_image, extract_text_from_pdf
 from app.sage_client import (
     check_sage_auth,
     debug_refresh,
@@ -396,6 +396,34 @@ def _find_first_pdf_attachment(payload: Dict[str, Any]) -> Optional[Dict[str, An
     return _select_pdf_attachment(candidates)
 
 
+def _find_image_attachments(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Return all image attachments (JPEG, PNG, etc.) decoded from the Postmark payload."""
+    attachments = payload.get("Attachments") or []
+    if not isinstance(attachments, list):
+        return []
+    _IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff")
+    _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".tiff")
+    results: list[Dict[str, Any]] = []
+    for attachment in attachments:
+        if not isinstance(attachment, dict):
+            continue
+        content_type = (attachment.get("ContentType") or "").lower()
+        name = (attachment.get("Name") or "").lower()
+        if any(t in content_type for t in _IMAGE_TYPES) or any(name.endswith(ext) for ext in _IMAGE_EXTS):
+            content = attachment.get("Content")
+            if content:
+                try:
+                    img_bytes = base64.b64decode(content)
+                    results.append({
+                        "Name": attachment.get("Name") or "image.jpg",
+                        "ContentType": content_type,
+                        "ContentBytes": img_bytes,
+                    })
+                except Exception:
+                    pass
+    return results
+
+
 def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     raw = payload.get("RawEmail") or payload.get("RawMessage") or payload.get("RawSource")
     if not raw:
@@ -432,6 +460,43 @@ def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, A
                 break
 
     return None
+
+
+def _extract_images_from_raw_email(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Extract image attachments from a raw MIME email in the Postmark payload."""
+    raw = payload.get("RawEmail") or payload.get("RawMessage") or payload.get("RawSource")
+    if not raw:
+        return []
+    raw_bytes = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", errors="ignore")
+    _IMAGE_TYPES = ("image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff")
+    _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".tiff")
+    results: list[Dict[str, Any]] = []
+    for attempt in range(2):
+        try:
+            msg = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+        except Exception:
+            msg = None
+        if msg:
+            for part in msg.walk():
+                content_type = (part.get_content_type() or "").lower()
+                filename = part.get_filename() or ""
+                name_lower = filename.lower()
+                if any(t in content_type for t in _IMAGE_TYPES) or any(name_lower.endswith(ext) for ext in _IMAGE_EXTS):
+                    part_bytes = part.get_payload(decode=True)
+                    if part_bytes:
+                        results.append({
+                            "Name": filename or "image.jpg",
+                            "ContentType": content_type,
+                            "ContentBytes": part_bytes,
+                        })
+            if results:
+                return results
+        if attempt == 0 and isinstance(raw, str):
+            try:
+                raw_bytes = base64.b64decode(raw, validate=False)
+            except Exception:
+                break
+    return results
 
 
 def _extract_sender_email(payload: Dict[str, Any]) -> Optional[str]:
@@ -1308,6 +1373,72 @@ async def sage_callback(request: Request, code: str = "", error: str = "", state
     )
 
 
+def _detect_and_parse(
+    text: str,
+    sender_email: str,
+    attachment_name: str,
+    raise_on_unknown: bool = True,
+) -> Optional[list[InvoiceData]]:
+    """Detect supplier from text/sender and return parsed invoices.
+
+    Returns None (or raises HTTPException when raise_on_unknown=True) if no supplier matched.
+    """
+    is_clf_sender = sender_email.endswith("@clfdistribution.com")
+    is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
+    is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
+    is_essential_sender = sender_email.endswith("@essential-trading.coop")
+
+    if is_hunts_sender or _text_looks_like_hunts(text):
+        if not is_hunts_sender:
+            logger.info("Sender not Hunts domain but text looks like Hunts; using Hunts parser: %s", sender_email)
+        return parse_hunts(text)
+    elif is_essential_sender or _text_looks_like_essential(text):
+        if not is_essential_sender:
+            logger.info("Sender not Essential domain but text looks like Essential; using Essential parser: %s", sender_email)
+        return [parse_essential(text)]
+    elif is_clf_sender or _text_looks_like_clf(text):
+        if not is_clf_sender:
+            logger.info("Sender not CLF domain but text looks like CLF; using CLF parser: %s", sender_email)
+        return [parse_clf(text)]
+    elif is_viridian_sender or _text_looks_like_viridian(text):
+        if not is_viridian_sender:
+            logger.info("Sender not Viridian domain but text looks like Viridian; using Viridian parser: %s", sender_email)
+        return [parse_viridian(text)]
+    elif _text_looks_like_watson_pratt(text) or _filename_looks_like_watson_pratt(attachment_name):
+        if not _text_looks_like_watson_pratt(text):
+            logger.info("Text did not match Watson & Pratt heuristics; matched by filename: %s", attachment_name)
+        return [parse_watson_pratt(text)]
+    elif _text_looks_like_nestle(text):
+        return [parse_nestle(text)]
+    elif _text_looks_like_natures_plus(text):
+        return [parse_natures_plus(text)]
+    elif _text_looks_like_bionature(text):
+        return [parse_bionature(text)]
+    elif _text_looks_like_natures_aid(text):
+        return [parse_natures_aid(text)]
+    elif _text_looks_like_tonyrefail(text):
+        return [parse_tonyrefail(text)]
+    elif _text_looks_like_avogel(text):
+        return [parse_avogel(text)]
+    elif _text_looks_like_emporio(text):
+        return [parse_emporio(text)]
+    elif _text_looks_like_pestokill(text):
+        return [parse_pestokill(text)]
+    elif _text_looks_like_absolute_aromas(text):
+        return [parse_absolute_aromas(text)]
+    elif _text_looks_like_lewtress(text):
+        return [parse_lewtress(text)]
+    elif _text_looks_like_biocare(text):
+        return [parse_biocare(text)]
+    elif _text_looks_like_kinetic(text):
+        return [parse_kinetic(text)]
+    else:
+        logger.warning("No supplier parser matched", extra={"sender": sender_email, "attachment": attachment_name})
+        if raise_on_unknown:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
+        return None
+
+
 @app.post("/postmark/inbound")
 async def postmark_inbound(request: Request) -> Dict[str, Any]:
     _check_basic_auth(request)
@@ -1350,21 +1481,175 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
     raw_pdf_attachment = None if pdf_attachment else _extract_pdf_from_raw_email(payload)
 
     if not pdf_attachment and not raw_pdf_attachment:
-        if FIRESTORE_ENABLED:
+        # Try image attachments via OCR before giving up.
+        image_attachments = _find_image_attachments(payload)
+        if not image_attachments:
+            image_attachments = _extract_images_from_raw_email(payload)
+
+        if not image_attachments:
+            if FIRESTORE_ENABLED:
+                try:
+                    enqueue_record(
+                        {
+                            "status": "no_pdf",
+                            "source": "postmark",
+                            "payload_meta": _payload_meta(payload),
+                        }
+                    )
+                except Exception:
+                    logger.exception("Failed to write Firestore record for no-pdf payload")
+            return {
+                "status": "ok",
+                "max_request_bytes": _max_request_bytes(),
+                "message": "No PDF attachment found",
+            }
+
+        # We have image attachments — process each via OCR.
+        ocr_sender_email = _extract_sender_email(payload) or ""
+        _enforce_blocklist(payload.get("Subject") or "")
+        _enforce_forwarder_whitelist(ocr_sender_email)
+        _enforce_rate_limit(ocr_sender_email)
+        logger.info("Processing %d image attachment(s) via OCR from %s", len(image_attachments), ocr_sender_email)
+
+        img_record_ids: list[str] = []
+        img_sage_results: list[dict[str, Any] | None] = []
+        img_parsed_payloads: list[Any] = []
+
+        for img_att in image_attachments:
+            img_bytes = img_att["ContentBytes"]
+            img_name = img_att.get("Name") or "image.jpg"
+            logger.info("OCR: processing %s (%d bytes)", img_name, len(img_bytes))
             try:
-                enqueue_record(
-                    {
-                        "status": "no_pdf",
-                        "source": "postmark",
-                        "payload_meta": _payload_meta(payload),
-                    }
-                )
+                img_text = extract_text_from_image(img_bytes)
+                _log_pdf_text(img_text)
             except Exception:
-                logger.exception("Failed to write Firestore record for no-pdf payload")
+                logger.exception("OCR failed for image: %s", img_name)
+                continue
+
+            if not img_text.strip():
+                logger.warning("OCR produced no text for image: %s", img_name)
+                continue
+
+            img_invoices = _detect_and_parse(img_text, ocr_sender_email, img_name, raise_on_unknown=False)
+            if img_invoices is None:
+                logger.warning("No supplier matched for OCR image: %s", img_name)
+                continue
+
+            for inv in img_invoices:
+                img_parsed_dict = _invoice_to_dict(inv)
+                img_parsed_payloads.append(img_parsed_dict)
+                logger.info("Parsed image invoice: %s", img_parsed_dict)
+
+                rec_id: Optional[str] = None
+                if FIRESTORE_ENABLED:
+                    try:
+                        rec_id = enqueue_record(
+                            {
+                                "status": "parsed",
+                                "source": "postmark_image_ocr",
+                                "payload_meta": _payload_meta(payload),
+                                "attachment": {
+                                    "name": img_name,
+                                    "content_type": img_att.get("ContentType"),
+                                    "size_bytes": len(img_bytes),
+                                },
+                                "parsed": _serialize_for_storage(img_parsed_dict),
+                            }
+                        )
+                        img_record_ids.append(rec_id)
+                        logger.info("Enqueued Firestore record for image invoice: %s", rec_id)
+                    except Exception:
+                        logger.exception("Failed to write Firestore record for image invoice")
+
+                if SAGE_ENABLED:
+                    try:
+                        if FIRESTORE_ENABLED:
+                            ref_date = (
+                                inv.invoice_date.isoformat()
+                                if hasattr(inv.invoice_date, "isoformat")
+                                else str(inv.invoice_date)
+                            )
+                            reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
+                            if not reserved:
+                                sage_exists = _sage_duplicate_exists(inv)
+                                dup_reason = "duplicate_sage" if sage_exists is True else "reference_locked"
+                                img_sage_result: dict[str, Any] | None = {
+                                    "status": "skipped",
+                                    "reason": dup_reason,
+                                    "number": inv.supplier_reference,
+                                }
+                                if rec_id:
+                                    update_record(rec_id, {"status": "skipped", "sage": img_sage_result})
+                                img_sage_results.append(img_sage_result)
+                                continue
+
+                        if _is_duplicate_post(inv):
+                            sage_exists = _sage_duplicate_exists(inv)
+                            dup_reason = "duplicate_sage" if sage_exists is True else "duplicate_local"
+                            img_sage_result = {
+                                "status": "skipped",
+                                "reason": dup_reason,
+                                "number": inv.supplier_reference,
+                            }
+                            if rec_id:
+                                update_record(rec_id, {"status": "skipped", "sage": img_sage_result})
+                            img_sage_results.append(img_sage_result)
+                            continue
+
+                        if inv.is_credit:
+                            img_sage_result = post_purchase_credit_note(inv)
+                        else:
+                            img_sage_result = post_purchase_invoice(inv)
+
+                        if isinstance(img_sage_result, dict) and img_sage_result.get("id"):
+                            logger.info("Sage created id: %s", img_sage_result.get("id"))
+                            try:
+                                attachment_result = attach_pdf_to_sage(
+                                    "purchase_credit_note" if inv.is_credit else "purchase_invoice",
+                                    img_sage_result["id"],
+                                    img_name,
+                                    img_bytes,
+                                )
+                                img_sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
+                                logger.info("Attached image to Sage id: %s", img_sage_result.get("id"))
+                            except Exception as exc:
+                                logger.exception("Failed to attach image to Sage: %s", exc)
+                                img_sage_result["attachment"] = {"status": "error", "message": str(exc)}
+
+                        if rec_id:
+                            if isinstance(img_sage_result, dict) and img_sage_result.get("id"):
+                                update_record(rec_id, {"status": "posted", "sage": img_sage_result})
+                            elif isinstance(img_sage_result, dict) and img_sage_result.get("status") == "skipped":
+                                update_record(rec_id, {"status": "skipped", "sage": img_sage_result})
+                            else:
+                                update_record(rec_id, {"status": "unknown", "sage": img_sage_result})
+                        img_sage_results.append(img_sage_result)
+                    except Exception as exc:
+                        logger.exception("Sage post failed for image invoice: %s", exc)
+                        img_sage_result = {"status": "error", "message": str(exc)}
+                        if rec_id:
+                            update_record(rec_id, {"status": "error", "error": str(exc)})
+                        img_sage_results.append(img_sage_result)
+
+        if FIRESTORE_ENABLED and message_id:
+            try:
+                msg_status = "parsed"
+                if SAGE_ENABLED and img_sage_results:
+                    if any(isinstance(r, dict) and r.get("status") == "error" for r in img_sage_results):
+                        msg_status = "error"
+                    elif any(isinstance(r, dict) and r.get("id") for r in img_sage_results):
+                        msg_status = "posted"
+                update_message_status(str(message_id), {"status": msg_status, "record_id": img_record_ids})
+            except Exception:
+                logger.exception("Failed to update message_id status for image invoices")
+
         return {
             "status": "ok",
             "max_request_bytes": _max_request_bytes(),
-            "message": "No PDF attachment found",
+            "parsed": img_parsed_payloads if len(img_parsed_payloads) > 1 else (img_parsed_payloads[0] if img_parsed_payloads else None),
+            "sage": img_sage_results if len(img_sage_results) > 1 else (img_sage_results[0] if img_sage_results else None),
+            "record_id": img_record_ids if len(img_record_ids) > 1 else (img_record_ids[0] if img_record_ids else None),
+            "source": "image_ocr",
         }
 
     if raw_pdf_attachment:
@@ -1399,67 +1684,7 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         (payload.get("FromFull") or {}).get("Email"),
         payload.get("OriginalSender"),
     )
-    is_clf_sender = sender_email.endswith("@clfdistribution.com")
-    is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
-    is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
-    is_essential_sender = sender_email.endswith("@essential-trading.coop")
-
-    invoices: list[InvoiceData]
-    if is_hunts_sender or _text_looks_like_hunts(text):
-        if not is_hunts_sender:
-            logger.info("Sender not Hunts domain but PDF looks like Hunts; using Hunts parser: %s", sender_email)
-        invoices = parse_hunts(text)
-    elif is_essential_sender or _text_looks_like_essential(text):
-        if not is_essential_sender:
-            logger.info(
-                "Sender not Essential domain but PDF looks like Essential; using Essential parser: %s",
-                sender_email,
-            )
-        invoices = [parse_essential(text)]
-    elif is_clf_sender or _text_looks_like_clf(text):
-        if not is_clf_sender:
-            logger.info("Sender not CLF domain but PDF looks like CLF; using CLF parser: %s", sender_email)
-        invoices = [parse_clf(text)]
-    elif is_viridian_sender or _text_looks_like_viridian(text):
-        if not is_viridian_sender:
-            logger.info("Sender not Viridian domain but PDF looks like Viridian; using Viridian parser: %s", sender_email)
-        invoices = [parse_viridian(text)]
-    elif _text_looks_like_watson_pratt(text) or _filename_looks_like_watson_pratt(
-        pdf_attachment.get("Name") or ""
-    ):
-        if not _text_looks_like_watson_pratt(text):
-            logger.info(
-                "Text did not match Watson & Pratt heuristics; matched by filename: %s",
-                pdf_attachment.get("Name"),
-            )
-        invoices = [parse_watson_pratt(text)]
-    elif _text_looks_like_nestle(text):
-        invoices = [parse_nestle(text)]
-    elif _text_looks_like_natures_plus(text):
-        invoices = [parse_natures_plus(text)]
-    elif _text_looks_like_bionature(text):
-        invoices = [parse_bionature(text)]
-    elif _text_looks_like_natures_aid(text):
-        invoices = [parse_natures_aid(text)]
-    elif _text_looks_like_tonyrefail(text):
-        invoices = [parse_tonyrefail(text)]
-    elif _text_looks_like_avogel(text):
-        invoices = [parse_avogel(text)]
-    elif _text_looks_like_emporio(text):
-        invoices = [parse_emporio(text)]
-    elif _text_looks_like_pestokill(text):
-        invoices = [parse_pestokill(text)]
-    elif _text_looks_like_absolute_aromas(text):
-        invoices = [parse_absolute_aromas(text)]
-    elif _text_looks_like_lewtress(text):
-        invoices = [parse_lewtress(text)]
-    elif _text_looks_like_biocare(text):
-        invoices = [parse_biocare(text)]
-    elif _text_looks_like_kinetic(text):
-        invoices = [parse_kinetic(text)]
-    else:
-        logger.warning("No supplier parser matched; refusing to default to CLF", extra={"sender": sender_email})
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
+    invoices = _detect_and_parse(text, sender_email, pdf_attachment.get("Name") or "" if pdf_attachment else "")
 
     parsed_payloads = [_invoice_to_dict(inv) for inv in invoices]
     logger.info("Parsed invoice data: %s", parsed_payloads)
