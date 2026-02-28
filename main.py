@@ -336,6 +336,7 @@ def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
         is_credit=bool(payload.get("is_credit", False)),
         deliver_to_postcode=payload.get("deliver_to_postcode"),
         ledger_account=payload.get("ledger_account"),
+        contact_id=payload.get("contact_id"),
         vat_net=vat_net,
         nonvat_net=nonvat_net,
         vat_amount=vat_amount,
