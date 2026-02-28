@@ -1233,6 +1233,23 @@ async def sage_search_invoices(request: Request, reference: str) -> Dict[str, An
     return {"status": "ok", "reference": reference.strip(), "sage_id": sage_id, "found": sage_id is not None}
 
 
+@app.get("/sage/lookup-invoice")
+async def sage_lookup_invoice(request: Request, sage_id: str) -> Dict[str, Any]:
+    """Direct GET /purchase_invoices/{id} — verify an invoice exists in Sage."""
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    _check_basic_auth(request)
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    resp = _req.get(f"{SAGE_API_BASE}/purchase_invoices/{sage_id.strip()}", headers=_sage_headers(access_token, business_id), timeout=30)
+    if resp.status_code == 404:
+        return {"status": "not_found", "sage_id": sage_id}
+    if resp.status_code >= 400:
+        return {"status": "error", "http_status": resp.status_code, "body": resp.text[:500]}
+    d = resp.json()
+    return {"status": "ok", "sage_id": sage_id, "reference": d.get("reference"), "vendor_reference": d.get("vendor_reference"), "contact": (d.get("contact") or {}).get("displayed_as"), "total": d.get("total_amount"), "date": d.get("date"), "invoice_status": (d.get("status") or {}).get("id")}
+
+
 @app.get("/sage/debug-search")
 async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
     """Raw Sage API search — returns first strategy's $items to diagnose field names."""
