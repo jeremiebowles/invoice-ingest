@@ -1250,6 +1250,22 @@ async def sage_lookup_invoice(request: Request, sage_id: str) -> Dict[str, Any]:
     return {"status": "ok", "sage_id": sage_id, "reference": d.get("reference"), "vendor_reference": d.get("vendor_reference"), "contact": (d.get("contact") or {}).get("displayed_as"), "total": d.get("total_amount"), "date": d.get("date"), "invoice_status": (d.get("status") or {}).get("id")}
 
 
+@app.get("/sage/debug-businesses")
+async def sage_debug_businesses(request: Request) -> Dict[str, Any]:
+    """Check what Sage businesses the token has access to and what SAGE_BUSINESS_ID is set to."""
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    _check_basic_auth(request)
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    resp = _req.get(f"{SAGE_API_BASE}/businesses", headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"}, timeout=30)
+    businesses = []
+    if resp.status_code < 400:
+        for b in (resp.json().get("$items") or []):
+            businesses.append({"id": b.get("id"), "name": b.get("name"), "displayed_as": b.get("displayed_as")})
+    return {"status": "ok", "configured_business_id": business_id, "businesses": businesses, "businesses_http_status": resp.status_code}
+
+
 @app.get("/sage/debug-search")
 async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
     """Raw Sage API search — returns first strategy's $items to diagnose field names."""
