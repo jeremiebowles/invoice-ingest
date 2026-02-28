@@ -1169,7 +1169,7 @@ async def sage_post_by_reference(
                     }
                     update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
                     return {"status": "ok", "sage": skip, "record_id": record_id}
-        if _is_duplicate_post(invoice):
+        if not force and _is_duplicate_post(invoice):
             duplicate = _duplicate_payload(invoice, "duplicate_local")
             skip = {"status": "skipped", "reason": "duplicate_local", "number": invoice.supplier_reference}
             update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
