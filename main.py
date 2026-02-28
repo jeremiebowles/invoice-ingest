@@ -1600,6 +1600,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
 
                 if SAGE_ENABLED:
                     try:
+                        img_sage_result: dict[str, Any] | None = None
+                        skip_post = False
                         if FIRESTORE_ENABLED:
                             ref_date = (
                                 inv.invoice_date.isoformat()
@@ -1610,17 +1612,14 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                             if not reserved:
                                 sage_exists = _sage_duplicate_exists(inv)
                                 dup_reason = "duplicate_sage" if sage_exists is True else "reference_locked"
-                                img_sage_result: dict[str, Any] | None = {
+                                img_sage_result = {
                                     "status": "skipped",
                                     "reason": dup_reason,
                                     "number": inv.supplier_reference,
                                 }
-                                if rec_id:
-                                    update_record(rec_id, {"status": "skipped", "sage": img_sage_result})
-                                img_sage_results.append(img_sage_result)
-                                continue
+                                skip_post = True
 
-                        if _is_duplicate_post(inv):
+                        if not skip_post and _is_duplicate_post(inv):
                             sage_exists = _sage_duplicate_exists(inv)
                             dup_reason = "duplicate_sage" if sage_exists is True else "duplicate_local"
                             img_sage_result = {
@@ -1628,33 +1627,48 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                                 "reason": dup_reason,
                                 "number": inv.supplier_reference,
                             }
-                            if rec_id:
-                                update_record(rec_id, {"status": "skipped", "sage": img_sage_result})
-                            img_sage_results.append(img_sage_result)
-                            continue
+                            skip_post = True
 
-                        if inv.is_credit:
-                            img_sage_result = post_purchase_credit_note(inv)
-                        else:
-                            img_sage_result = post_purchase_invoice(inv)
+                        if not skip_post:
+                            if inv.is_credit:
+                                img_sage_result = post_purchase_credit_note(inv)
+                            else:
+                                img_sage_result = post_purchase_invoice(inv)
 
+                        # Determine Sage ID — either from fresh post or by looking up existing invoice
+                        sage_id_for_attach: Optional[str] = None
                         if isinstance(img_sage_result, dict) and img_sage_result.get("id"):
-                            logger.info("Sage created id: %s", img_sage_result.get("id"))
+                            sage_id_for_attach = img_sage_result["id"]
+                            logger.info("Sage created id: %s", sage_id_for_attach)
+                        elif skip_post:
+                            # Invoice already exists — find its Sage ID so we can attach
+                            try:
+                                existing = search_purchase_invoices_by_reference(inv.supplier_reference)
+                                if existing:
+                                    sage_id_for_attach = existing[0].get("id")
+                                    logger.info("Found existing Sage id for attachment: %s", sage_id_for_attach)
+                            except Exception as exc:
+                                logger.warning("Could not look up existing Sage id for %s: %s", inv.supplier_reference, exc)
+
+                        if sage_id_for_attach:
                             try:
                                 import img2pdf  # type: ignore[import]
                                 pdf_bytes_for_attach = img2pdf.convert(img_bytes)
                                 attach_name = re.sub(r"\.[^.]+$", ".pdf", img_name) if "." in img_name else f"{img_name}.pdf"
                                 attachment_result = attach_pdf_to_sage(
                                     "purchase_credit_note" if inv.is_credit else "purchase_invoice",
-                                    img_sage_result["id"],
+                                    sage_id_for_attach,
                                     attach_name,
                                     pdf_bytes_for_attach,
                                 )
-                                img_sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
-                                logger.info("Attached image (as PDF) to Sage id: %s", img_sage_result.get("id"))
+                                attach_status = {"status": "ok", "id": attachment_result.get("id")}
+                                logger.info("Attached image (as PDF) to Sage id: %s", sage_id_for_attach)
                             except Exception as exc:
                                 logger.exception("Failed to attach image to Sage: %s", exc)
-                                img_sage_result["attachment"] = {"status": "error", "message": str(exc)}
+                                attach_status = {"status": "error", "message": str(exc)}
+                            if img_sage_result is None:
+                                img_sage_result = {}
+                            img_sage_result["attachment"] = attach_status
 
                         if rec_id:
                             if isinstance(img_sage_result, dict) and img_sage_result.get("id"):

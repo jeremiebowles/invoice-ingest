@@ -826,7 +826,7 @@ def search_purchase_invoices_by_reference(reference: str) -> list[Dict[str, Any]
     resp = requests.get(
         f"{SAGE_API_BASE}/purchase_invoices",
         headers=_sage_headers(access_token, business_id),
-        params={"search": reference, "attributes": "id,reference,vendor_reference,contact,total_amount,date,status"},
+        params={"search": reference},
         timeout=30,
     )
     _raise_for_status_with_body(resp, "Sage purchase invoice search")
