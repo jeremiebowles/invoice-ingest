@@ -1233,6 +1233,27 @@ async def sage_search_invoices(request: Request, reference: str) -> Dict[str, An
     return {"status": "ok", "reference": reference.strip(), "sage_id": sage_id, "found": sage_id is not None}
 
 
+@app.get("/sage/debug-search")
+async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
+    """Raw Sage API search — returns first strategy's $items to diagnose field names."""
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    _check_basic_auth(request)
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    results = {}
+    for label, params in [
+        ("search", {"search": ref, "items_per_page": 10}),
+        ("vendor_reference", {"vendor_reference": ref}),
+        ("filter_vr", {"filter": f"vendor_reference eq '{ref}'"}),
+        ("filter_ref", {"filter": f"reference eq '{ref}'"}),
+    ]:
+        resp = _req.get(f"{SAGE_API_BASE}/purchase_invoices", headers=_sage_headers(access_token, business_id), params=params, timeout=30)
+        items = resp.json().get("$items", []) if resp.status_code < 400 else []
+        results[label] = [{"id": i.get("id","")[:16], "ref": i.get("reference"), "vr": i.get("vendor_reference"), "disp": i.get("displayed_as")} for i in items[:5]]
+    return {"status": "ok", "ref": ref, "results": results}
+
+
 @app.delete("/sage/void-invoice")
 async def sage_void_invoice(request: Request, sage_id: str) -> Dict[str, Any]:
     _check_basic_auth(request)
