@@ -610,8 +610,28 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
         json=payload,
         timeout=30,
     )
+    logger.info(
+        "Sage purchase invoice POST: HTTP %s body_preview=%s",
+        resp.status_code,
+        (resp.text or "")[:500],
+    )
     _raise_for_status_with_body(resp, "Sage purchase invoice")
-    return resp.json()
+    result = resp.json()
+    # Immediately verify the invoice is retrievable by direct GET
+    created_id = result.get("id") if isinstance(result, dict) else None
+    if created_id:
+        verify_resp = requests.get(
+            f"{SAGE_API_BASE}/purchase_invoices/{created_id}",
+            headers=_sage_headers(access_token, business_id),
+            timeout=30,
+        )
+        logger.info(
+            "Sage invoice verify GET %s: HTTP %s body_preview=%s",
+            created_id,
+            verify_resp.status_code,
+            (verify_resp.text or "")[:200],
+        )
+    return result
 
 
 def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:

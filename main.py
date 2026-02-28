@@ -1266,6 +1266,101 @@ async def sage_debug_businesses(request: Request) -> Dict[str, Any]:
     return {"status": "ok", "configured_business_id": business_id, "businesses": businesses, "businesses_http_status": resp.status_code}
 
 
+@app.post("/sage/test-invoice-roundtrip")
+async def sage_test_invoice_roundtrip(request: Request) -> Dict[str, Any]:
+    """Create a minimal test purchase invoice in Sage, then immediately GET it back.
+
+    This diagnoses the mystery of invoices that return 200 on POST but 404 on GET.
+    The test invoice will be voided automatically after the check.
+    """
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    import time as _time
+
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    contact_id = _get_env("SAGE_CONTACT_ID")
+    ledger_id = _get_env("SAGE_LEDGER_5001_ID")
+
+    test_ref = f"TEST-RT-{int(_time.time())}"
+    payload = {
+        "purchase_invoice": {
+            "contact_id": contact_id,
+            "date": "2026-02-28",
+            "due_date": "2026-03-30",
+            "reference": test_ref,
+            "vendor_reference": test_ref,
+            "invoice_lines": [
+                {
+                    "description": "Roundtrip test — delete me",
+                    "ledger_account_id": ledger_id,
+                    "quantity": 1,
+                    "unit_price": 1.00,
+                    "net_amount": 1.00,
+                    "tax_rate_id": _get_env("SAGE_TAX_ZERO_ID") or "GB_ZERO",
+                    "tax_amount": 0,
+                    "total_amount": 1.00,
+                }
+            ],
+        }
+    }
+
+    post_resp = _req.post(
+        f"{SAGE_API_BASE}/purchase_invoices",
+        headers=_sage_headers(access_token, business_id),
+        json=payload,
+        timeout=30,
+    )
+    post_status = post_resp.status_code
+    try:
+        post_body = post_resp.json()
+    except Exception:
+        post_body = {"raw": post_resp.text[:1000]}
+
+    created_id = post_body.get("id") if isinstance(post_body, dict) else None
+
+    get_status = None
+    get_body = None
+    if created_id:
+        get_resp = _req.get(
+            f"{SAGE_API_BASE}/purchase_invoices/{created_id}",
+            headers=_sage_headers(access_token, business_id),
+            timeout=30,
+        )
+        get_status = get_resp.status_code
+        try:
+            get_body = get_resp.json()
+        except Exception:
+            get_body = {"raw": get_resp.text[:500]}
+
+        # Void the test invoice
+        _req.delete(
+            f"{SAGE_API_BASE}/purchase_invoices/{created_id}",
+            headers=_sage_headers(access_token, business_id),
+            timeout=30,
+        )
+
+    return {
+        "status": "ok",
+        "test_ref": test_ref,
+        "business_id": business_id,
+        "contact_id": contact_id,
+        "post_http_status": post_status,
+        "post_response_id": created_id,
+        "post_response_reference": post_body.get("reference") if isinstance(post_body, dict) else None,
+        "post_response_contact": (post_body.get("contact") or {}).get("displayed_as") if isinstance(post_body, dict) else None,
+        "post_response_status": (post_body.get("status") or {}).get("id") if isinstance(post_body, dict) else None,
+        "post_response_keys": list(post_body.keys()) if isinstance(post_body, dict) else None,
+        "get_http_status": get_status,
+        "get_response_id": get_body.get("id") if isinstance(get_body, dict) else None,
+        "roundtrip_ok": get_status == 200 if get_status is not None else None,
+    }
+
+
 @app.get("/sage/debug-search")
 async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
     """Raw Sage API search — returns first strategy's $items to diagnose field names."""
