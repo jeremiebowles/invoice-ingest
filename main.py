@@ -66,6 +66,8 @@ from app.sage_client import (
     sage_invoice_exists,
     count_purchase_invoices,
     sage_env_hashes,
+    search_purchase_invoices_by_reference,
+    void_purchase_invoice,
 )
 
 
@@ -1097,6 +1099,7 @@ async def sage_post_by_reference(
     supplier_reference: str,
     invoice_date: Optional[str] = None,
     force: bool = False,
+    record_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     _check_basic_auth(request)
 
@@ -1109,19 +1112,30 @@ async def sage_post_by_reference(
     if not records:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No records found for reference")
 
-    record_id = None
+    selected_record_id = None
     record = None
-    invoice_date_text = invoice_date.strip() if invoice_date else None
-    if invoice_date_text:
+    # If caller specified an exact record_id, use that directly
+    if record_id:
         for item in records:
-            parsed = (item.get("data") or {}).get("parsed") or {}
-            if str(parsed.get("invoice_date")) == invoice_date_text:
-                record_id = item.get("id")
+            if item.get("id") == record_id:
+                selected_record_id = record_id
                 record = item.get("data")
                 break
-    if not record:
-        record_id = records[0].get("id")
-        record = records[0].get("data") if records else None
+        if not selected_record_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"record_id {record_id} not found")
+    else:
+        invoice_date_text = invoice_date.strip() if invoice_date else None
+        if invoice_date_text:
+            for item in records:
+                parsed = (item.get("data") or {}).get("parsed") or {}
+                if str(parsed.get("invoice_date")) == invoice_date_text:
+                    selected_record_id = item.get("id")
+                    record = item.get("data")
+                    break
+        if not record:
+            selected_record_id = records[0].get("id")
+            record = records[0].get("data") if records else None
+    record_id = selected_record_id
 
     if not record_id or not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No matching record found")
@@ -1202,6 +1216,24 @@ async def sage_post_by_reference(
         update_record(record_id, {"status": "unknown", "sage": sage_result})
 
     return {"status": "ok", "sage": sage_result, "record_id": record_id}
+
+
+@app.get("/sage/search-invoices")
+async def sage_search_invoices(request: Request, reference: str) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not reference or not reference.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing reference")
+    results = search_purchase_invoices_by_reference(reference.strip())
+    return {"status": "ok", "reference": reference.strip(), "count": len(results), "invoices": results}
+
+
+@app.delete("/sage/void-invoice")
+async def sage_void_invoice(request: Request, sage_id: str) -> Dict[str, Any]:
+    _check_basic_auth(request)
+    if not sage_id or not sage_id.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing sage_id")
+    result = void_purchase_invoice(sage_id.strip())
+    return {"status": "ok", "result": result}
 
 
 @app.get("/sage/queue-latest")

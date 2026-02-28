@@ -4,6 +4,7 @@ import os
 import hashlib
 import logging
 import base64
+import time
 from datetime import date, timedelta
 from typing import Any, Dict, Optional
 
@@ -15,6 +16,12 @@ from app.models import InvoiceData
 SAGE_TOKEN_URL = "https://oauth.accounting.sage.com/token"
 SAGE_API_BASE = "https://api.accounting.sage.com/v3.1"
 logger = logging.getLogger(__name__)
+
+_TOKEN_LOCK_COLLECTION = "token_locks"
+_TOKEN_LOCK_DOC = "sage_refresh"
+_TOKEN_LOCK_TTL = 45      # seconds before a held lock is treated as stale (crashed worker)
+_TOKEN_LOCK_MAX_WAIT = 30 # max seconds a worker will wait for the lock
+_TOKEN_LOCK_POLL = 2      # polling interval in seconds
 
 _ATTACHMENT_CONTEXT_TYPES = {
     "purchase_invoice": "PURCHASE_INVOICE",
@@ -63,64 +70,143 @@ def _store_refresh_token(refresh_token: str) -> None:
     )
 
 
+def _acquire_token_lock() -> bool:
+    """Atomically acquire the token refresh lock. Returns True if acquired.
+    Fails open (returns True) if Firestore is unavailable, so a Firestore outage
+    never blocks invoice processing entirely."""
+    from google.cloud import firestore as _fs
+    from google.api_core.exceptions import AlreadyExists
+    try:
+        db = _fs.Client(database=_get_env("FIRESTORE_DATABASE") or None)
+        lock_ref = db.collection(_TOKEN_LOCK_COLLECTION).document(_TOKEN_LOCK_DOC)
+        # Stale lock cleanup: if existing lock is older than TTL, delete it first.
+        try:
+            snap = lock_ref.get()
+            if snap.exists:
+                age = time.time() - (snap.to_dict() or {}).get("locked_at_epoch", 0)
+                if age > _TOKEN_LOCK_TTL:
+                    lock_ref.delete()
+        except Exception:
+            pass
+        # Atomic create — raises AlreadyExists if another worker holds the lock.
+        lock_ref.create({
+            "locked_at_epoch": time.time(),
+            "locked_at": _fs.SERVER_TIMESTAMP,
+        })
+        return True
+    except AlreadyExists:
+        return False
+    except Exception as exc:
+        logger.warning("Token lock acquire failed (proceeding without lock): %s", exc)
+        return True  # fail open
+
+
+def _release_token_lock() -> None:
+    """Release the token refresh lock by deleting the Firestore document."""
+    try:
+        from google.cloud import firestore as _fs
+        db = _fs.Client(database=_get_env("FIRESTORE_DATABASE") or None)
+        db.collection(_TOKEN_LOCK_COLLECTION).document(_TOKEN_LOCK_DOC).delete()
+    except Exception as exc:
+        logger.warning("Token lock release failed: %s", exc)
+
+
+def _wait_for_token_lock() -> None:
+    """Poll Firestore until the token lock is released or TTL/timeout is reached."""
+    try:
+        from google.cloud import firestore as _fs
+        db = _fs.Client(database=_get_env("FIRESTORE_DATABASE") or None)
+        lock_ref = db.collection(_TOKEN_LOCK_COLLECTION).document(_TOKEN_LOCK_DOC)
+        deadline = time.time() + _TOKEN_LOCK_MAX_WAIT
+        while time.time() < deadline:
+            time.sleep(_TOKEN_LOCK_POLL)
+            try:
+                snap = lock_ref.get()
+                if not snap.exists:
+                    return  # lock released
+                age = time.time() - (snap.to_dict() or {}).get("locked_at_epoch", 0)
+                if age > _TOKEN_LOCK_TTL:
+                    return  # stale lock, safe to proceed
+            except Exception:
+                return  # Firestore error, proceed anyway
+    except Exception as exc:
+        logger.warning("Token lock wait failed (proceeding): %s", exc)
+
+
 def _refresh_access_token() -> str:
     client_id = _get_env("SAGE_CLIENT_ID")
     client_secret = _get_env("SAGE_CLIENT_SECRET")
-    refresh_token = _get_refresh_token()
-
-    if not client_id or not client_secret or not refresh_token:
+    if not client_id or not client_secret:
         raise RuntimeError("Missing Sage OAuth env vars")
 
-    resp = requests.post(
-        SAGE_TOKEN_URL,
-        data={
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token,
-            "client_id": client_id,
-            "client_secret": client_secret,
-        },
-        headers={"Accept": "application/json"},
-        timeout=30,
-    )
-    if resp.status_code >= 400:
-        # The default requests exception message drops the response body, which is where
-        # Sage tells us whether this is invalid_grant, invalid_client, etc.
-        snippet = (resp.text or "")[:2000]
-        body: Dict[str, Any]
-        try:
-            body = resp.json()
-        except Exception:
-            body = {"raw": snippet}
+    acquired = _acquire_token_lock()
+    if not acquired:
+        logger.info("Sage token refresh lock held by another worker; waiting...")
+        _wait_for_token_lock()
+        acquired = _acquire_token_lock()
+        if not acquired:
+            logger.warning("Could not acquire token refresh lock after waiting; proceeding anyway")
 
-        # Do not log tokens even if Sage ever returned them unexpectedly.
-        redacted = dict(body) if isinstance(body, dict) else {"raw": snippet}
-        for k in ("access_token", "refresh_token", "id_token"):
-            if k in redacted:
-                redacted[k] = "<redacted>"
+    try:
+        # Read the refresh token INSIDE the lock so that a worker which waited
+        # picks up the newly-rotated token stored by the worker that just finished.
+        refresh_token = _get_refresh_token()
+        if not refresh_token:
+            raise RuntimeError("Missing Sage OAuth env vars")
 
-        logger.error(
-            "Sage token refresh failed: HTTP %s body=%s env_hashes=%s",
-            resp.status_code,
-            redacted,
-            sage_env_hashes(),
+        resp = requests.post(
+            SAGE_TOKEN_URL,
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
+            headers={"Accept": "application/json"},
+            timeout=30,
         )
-        raise RuntimeError(f"Sage token refresh failed: HTTP {resp.status_code} {redacted}")
+        if resp.status_code >= 400:
+            # The default requests exception message drops the response body, which is where
+            # Sage tells us whether this is invalid_grant, invalid_client, etc.
+            snippet = (resp.text or "")[:2000]
+            body: Dict[str, Any]
+            try:
+                body = resp.json()
+            except Exception:
+                body = {"raw": snippet}
 
-    data = resp.json()
-    new_refresh = data.get("refresh_token")
-    if new_refresh:
-        try:
-            _store_refresh_token(new_refresh)
-        except Exception:
-            logger.critical(
-                "CRITICAL: Failed to store rotated refresh token in Secret Manager. "
-                "The old token is now invalid. "
-                "New token hash: %s",
-                _sha256(new_refresh),
-                exc_info=True,
+            # Do not log tokens even if Sage ever returned them unexpectedly.
+            redacted = dict(body) if isinstance(body, dict) else {"raw": snippet}
+            for k in ("access_token", "refresh_token", "id_token"):
+                if k in redacted:
+                    redacted[k] = "<redacted>"
+
+            logger.error(
+                "Sage token refresh failed: HTTP %s body=%s env_hashes=%s",
+                resp.status_code,
+                redacted,
+                sage_env_hashes(),
             )
-            raise
-    return data["access_token"]
+            raise RuntimeError(f"Sage token refresh failed: HTTP {resp.status_code} {redacted}")
+
+        data = resp.json()
+        new_refresh = data.get("refresh_token")
+        if new_refresh:
+            try:
+                _store_refresh_token(new_refresh)
+            except Exception:
+                logger.critical(
+                    "CRITICAL: Failed to store rotated refresh token in Secret Manager. "
+                    "The old token is now invalid. "
+                    "New token hash: %s",
+                    _sha256(new_refresh),
+                    exc_info=True,
+                )
+                raise
+        return data["access_token"]
+    finally:
+        if acquired:
+            _release_token_lock()
 
 
 def check_sage_auth() -> Dict[str, Any]:
@@ -729,6 +815,45 @@ def _count_endpoint(
         return int(total)
     items = data.get("$items") or []
     return len(items)
+
+
+def search_purchase_invoices_by_reference(reference: str) -> list[Dict[str, Any]]:
+    """Return all Sage purchase invoices matching the given reference string."""
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+    access_token = _refresh_access_token()
+    resp = requests.get(
+        f"{SAGE_API_BASE}/purchase_invoices",
+        headers=_sage_headers(access_token, business_id),
+        params={"search": reference, "attributes": "id,reference,vendor_reference,contact,total_amount,date,status"},
+        timeout=30,
+    )
+    _raise_for_status_with_body(resp, "Sage purchase invoice search")
+    data = resp.json()
+    items = data.get("$items", [])
+    # Filter to exact reference matches
+    return [
+        i for i in items
+        if i.get("reference") == reference or i.get("vendor_reference") == reference
+    ]
+
+
+def void_purchase_invoice(sage_id: str) -> Dict[str, Any]:
+    """Void (delete) a Sage purchase invoice by its Sage ID."""
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing Sage business configuration")
+    access_token = _refresh_access_token()
+    resp = requests.delete(
+        f"{SAGE_API_BASE}/purchase_invoices/{sage_id}",
+        headers=_sage_headers(access_token, business_id),
+        timeout=30,
+    )
+    if resp.status_code == 204:
+        return {"status": "voided", "sage_id": sage_id}
+    _raise_for_status_with_body(resp, f"Sage void purchase invoice {sage_id}")
+    return resp.json()
 
 
 def count_purchase_invoices(
