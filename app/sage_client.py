@@ -818,25 +818,60 @@ def _count_endpoint(
 
 
 def search_purchase_invoices_by_reference(reference: str) -> list[Dict[str, Any]]:
-    """Return all Sage purchase invoices matching the given reference string."""
+    """Return Sage purchase invoices matching the given reference string.
+
+    Uses the same multi-strategy approach as _already_exists so that at least
+    one query finds the invoice regardless of which field Sage indexed it under.
+    """
     business_id = _get_env("SAGE_BUSINESS_ID")
     if not business_id:
         raise RuntimeError("Missing Sage business configuration")
     access_token = _refresh_access_token()
-    resp = requests.get(
-        f"{SAGE_API_BASE}/purchase_invoices",
-        headers=_sage_headers(access_token, business_id),
-        params={"search": reference},
-        timeout=30,
-    )
-    _raise_for_status_with_body(resp, "Sage purchase invoice search")
-    data = resp.json()
-    items = data.get("$items", [])
-    # Filter to exact reference matches
-    return [
-        i for i in items
-        if i.get("reference") == reference or i.get("vendor_reference") == reference
+    target = str(reference).strip().upper()
+
+    def _norm(v: Any) -> str:
+        return str(v).strip().upper()
+
+    def _matches(item: Dict[str, Any]) -> bool:
+        for key in ("reference", "vendor_reference", "invoice_number", "displayed_as"):
+            val = item.get(key)
+            if val and _norm(val) == target:
+                return True
+        return False
+
+    strategies = [
+        {"search": reference, "items_per_page": 50},
+        {"reference": reference},
+        {"vendor_reference": reference},
+        {"filter": f"reference eq '{reference}'"},
+        {"filter": f"vendor_reference eq '{reference}'"},
     ]
+    seen_ids: set[str] = set()
+    matched: list[Dict[str, Any]] = []
+    for params in strategies:
+        try:
+            resp = requests.get(
+                f"{SAGE_API_BASE}/purchase_invoices",
+                headers=_sage_headers(access_token, business_id),
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                continue
+            items = resp.json().get("$items") or []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if _matches(item):
+                    sid = item.get("id")
+                    if sid and sid not in seen_ids:
+                        seen_ids.add(sid)
+                        matched.append(item)
+        except Exception:
+            continue
+        if matched:
+            break  # found at least one — no need to try more strategies
+    return matched
 
 
 def void_purchase_invoice(sage_id: str) -> Dict[str, Any]:
