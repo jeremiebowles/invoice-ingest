@@ -1662,14 +1662,19 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         if isinstance(img_sage_result, dict) and img_sage_result.get("id"):
                             sage_id_for_attach = img_sage_result["id"]
                             logger.info("Sage created id: %s", sage_id_for_attach)
-                        elif skip_post:
-                            # Invoice already exists — find its Sage ID so we can attach
+                        elif skip_post and FIRESTORE_ENABLED:
+                            # Invoice already exists — find Sage ID from stored Firestore records
                             try:
-                                sage_id_for_attach = find_sage_invoice_id(inv.supplier_reference, inv.is_credit)
-                                if sage_id_for_attach:
-                                    logger.info("Found existing Sage id for attachment: %s", sage_id_for_attach)
+                                existing_recs = find_records_by_reference(inv.supplier_reference)
+                                for existing_rec in existing_recs:
+                                    existing_sage = (existing_rec.get("data") or {}).get("sage") or {}
+                                    existing_sage_id = existing_sage.get("id")
+                                    if existing_sage_id:
+                                        sage_id_for_attach = existing_sage_id
+                                        logger.info("Found existing Sage id for attachment from Firestore: %s", sage_id_for_attach)
+                                        break
                             except Exception as exc:
-                                logger.warning("Could not look up existing Sage id for %s: %s", inv.supplier_reference, exc)
+                                logger.warning("Could not find Sage ID from Firestore for %s: %s", inv.supplier_reference, exc)
 
                         if sage_id_for_attach:
                             try:
