@@ -1101,6 +1101,7 @@ async def sage_post_by_reference(
     invoice_date: Optional[str] = None,
     force: bool = False,
     record_id: Optional[str] = None,
+    contact_id_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     _check_basic_auth(request)
 
@@ -1146,6 +1147,9 @@ async def sage_post_by_reference(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Record missing parsed data")
 
     invoice = _invoice_from_payload(parsed)
+    if contact_id_override:
+        invoice = invoice.model_copy(update={"contact_id": contact_id_override}) if hasattr(invoice, "model_copy") else invoice.__class__(**{**_invoice_to_dict(invoice), "contact_id": contact_id_override})
+    logger.info("post-by-reference: contact_id=%s supplier=%s ref=%s", invoice.contact_id, invoice.supplier, invoice.supplier_reference)
 
     if not SAGE_ENABLED:
         logger.info("Sage disabled; skipping /sage/post-by-reference")
