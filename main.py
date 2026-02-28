@@ -1604,14 +1604,17 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         if isinstance(img_sage_result, dict) and img_sage_result.get("id"):
                             logger.info("Sage created id: %s", img_sage_result.get("id"))
                             try:
+                                import img2pdf  # type: ignore[import]
+                                pdf_bytes_for_attach = img2pdf.convert(img_bytes)
+                                attach_name = re.sub(r"\.[^.]+$", ".pdf", img_name) if "." in img_name else f"{img_name}.pdf"
                                 attachment_result = attach_pdf_to_sage(
                                     "purchase_credit_note" if inv.is_credit else "purchase_invoice",
                                     img_sage_result["id"],
-                                    img_name,
-                                    img_bytes,
+                                    attach_name,
+                                    pdf_bytes_for_attach,
                                 )
                                 img_sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
-                                logger.info("Attached image to Sage id: %s", img_sage_result.get("id"))
+                                logger.info("Attached image (as PDF) to Sage id: %s", img_sage_result.get("id"))
                             except Exception as exc:
                                 logger.exception("Failed to attach image to Sage: %s", exc)
                                 img_sage_result["attachment"] = {"status": "error", "message": str(exc)}
