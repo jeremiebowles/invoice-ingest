@@ -507,6 +507,62 @@ def _already_exists(
     return False
 
 
+def find_sage_invoice_id(reference: str, is_credit: bool = False) -> Optional[str]:
+    """Return the Sage ID of an existing purchase invoice/credit note, or None if not found.
+
+    Uses the same multi-strategy candidate loop as _already_exists so it succeeds
+    as long as at least one Sage query format returns the invoice.
+    """
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id or not reference or reference == "UNKNOWN":
+        return None
+    access_token = _refresh_access_token()
+    endpoint = "purchase_credit_notes" if is_credit else "purchase_invoices"
+    number_field = "credit_note_number" if is_credit else "invoice_number"
+    target = str(reference).strip().upper()
+
+    def _norm(value: Any) -> str:
+        return str(value).strip().upper()
+
+    def _matches(item: Dict[str, Any]) -> bool:
+        for key in (number_field, "reference", "vendor_reference", "displayed_as"):
+            value = item.get(key)
+            if value and _norm(value) == target:
+                return True
+        return False
+
+    candidates = [
+        {"search": reference, "items_per_page": 50},
+        {number_field: reference},
+        {"reference": reference},
+        {"vendor_reference": reference},
+        {"filter": f"{number_field} eq '{reference}'"},
+        {"filter": f"reference eq '{reference}'"},
+        {"filter": f"vendor_reference eq '{reference}'"},
+    ]
+    for params in candidates:
+        try:
+            resp = requests.get(
+                f"{SAGE_API_BASE}/{endpoint}",
+                headers=_sage_headers(access_token, business_id),
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                continue
+            items = resp.json().get("$items") or []
+            for item in items:
+                if isinstance(item, dict) and _matches(item):
+                    sage_id = item.get("id")
+                    if sage_id:
+                        logger.info("Found existing Sage %s id %s for %s", endpoint, sage_id, reference)
+                        return sage_id
+        except Exception as exc:
+            logger.info("find_sage_invoice_id failed for %s: %s", params, exc)
+            continue
+    return None
+
+
 def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
     contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")

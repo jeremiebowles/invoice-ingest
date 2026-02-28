@@ -68,6 +68,7 @@ from app.sage_client import (
     sage_env_hashes,
     search_purchase_invoices_by_reference,
     void_purchase_invoice,
+    find_sage_invoice_id,
 )
 
 
@@ -1228,8 +1229,8 @@ async def sage_search_invoices(request: Request, reference: str) -> Dict[str, An
     _check_basic_auth(request)
     if not reference or not reference.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing reference")
-    results = search_purchase_invoices_by_reference(reference.strip())
-    return {"status": "ok", "reference": reference.strip(), "count": len(results), "invoices": results}
+    sage_id = find_sage_invoice_id(reference.strip())
+    return {"status": "ok", "reference": reference.strip(), "sage_id": sage_id, "found": sage_id is not None}
 
 
 @app.delete("/sage/void-invoice")
@@ -1643,9 +1644,8 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                         elif skip_post:
                             # Invoice already exists — find its Sage ID so we can attach
                             try:
-                                existing = search_purchase_invoices_by_reference(inv.supplier_reference)
-                                if existing:
-                                    sage_id_for_attach = existing[0].get("id")
+                                sage_id_for_attach = find_sage_invoice_id(inv.supplier_reference, inv.is_credit)
+                                if sage_id_for_attach:
                                     logger.info("Found existing Sage id for attachment: %s", sage_id_for_attach)
                             except Exception as exc:
                                 logger.warning("Could not look up existing Sage id for %s: %s", inv.supplier_reference, exc)
