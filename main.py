@@ -1361,6 +1361,89 @@ async def sage_test_invoice_roundtrip(request: Request) -> Dict[str, Any]:
     }
 
 
+@app.post("/sage/test-attachment")
+async def sage_test_attachment(request: Request, sage_id: str) -> Dict[str, Any]:
+    """Test the full attachment pipeline against a real Sage purchase invoice ID.
+
+    Steps:
+    1. List attachment_context_types — checks what Sage returns and whether PURCHASE_INVOICE is present
+    2. Attempt to attach a minimal 1-line PDF to the given sage_id
+    3. Return full details of every step so we can see exactly where it fails
+    """
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    import base64 as _b64
+
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    headers = _sage_headers(access_token, business_id)
+
+    # Step 1: list attachment context types
+    ctx_resp = _req.get(f"{SAGE_API_BASE}/attachment_context_types", headers=headers, timeout=30)
+    ctx_items = []
+    ctx_target_id = None
+    if ctx_resp.status_code < 400:
+        for item in (ctx_resp.json().get("$items") or []):
+            entry = {"id": item.get("id"), "displayed_as": item.get("displayed_as")}
+            ctx_items.append(entry)
+            if item.get("id") == "PURCHASE_INVOICE" or item.get("displayed_as") == "PURCHASE_INVOICE":
+                ctx_target_id = item.get("id")
+
+    # Step 2: verify the invoice exists
+    inv_resp = _req.get(f"{SAGE_API_BASE}/purchase_invoices/{sage_id}", headers=headers, timeout=30)
+    inv_ok = inv_resp.status_code == 200
+
+    # Step 3: attempt to attach a minimal valid PDF
+    # Smallest valid PDF (hand-crafted, ~250 bytes)
+    minimal_pdf = (
+        b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+        b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 1 1]>>endobj\n"
+        b"xref\n0 4\n0000000000 65535 f\n0000000009 00000 n\n"
+        b"0000000058 00000 n\n0000000115 00000 n\n"
+        b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n190\n%%EOF"
+    )
+    encoded = _b64.b64encode(minimal_pdf).decode("utf-8")
+
+    attach_payload = {
+        "attachment": {
+            "file": encoded,
+            "file_name": "test-attachment.pdf",
+            "mime_type": "application/pdf",
+            "description": "Test attachment — safe to delete",
+            "file_extension": ".pdf",
+            "attachment_context_id": sage_id,
+            "attachment_context_type_id": ctx_target_id or "PURCHASE_INVOICE",
+        }
+    }
+    attach_resp = _req.post(
+        f"{SAGE_API_BASE}/attachments",
+        headers=headers,
+        json=attach_payload,
+        timeout=60,
+    )
+    try:
+        attach_body = attach_resp.json()
+    except Exception:
+        attach_body = {"raw": attach_resp.text[:500]}
+
+    return {
+        "status": "ok",
+        "sage_id": sage_id,
+        "invoice_exists": inv_ok,
+        "invoice_http_status": inv_resp.status_code,
+        "context_types_http_status": ctx_resp.status_code,
+        "context_types": ctx_items,
+        "context_type_id_found": ctx_target_id,
+        "attach_http_status": attach_resp.status_code,
+        "attach_response": attach_body,
+    }
+
+
 @app.get("/sage/debug-search")
 async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
     """Raw Sage API search — returns first strategy's $items to diagnose field names."""
