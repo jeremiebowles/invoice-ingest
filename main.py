@@ -1402,6 +1402,17 @@ async def sage_attach_jpeg(request: Request, sage_id: str, filename: Optional[st
     }
 
 
+@app.get("/sage/invoice-id")
+async def sage_get_invoice_id(request: Request, ref: str, contact_id: Optional[str] = None) -> Dict[str, Any]:
+    """Search Sage for a purchase invoice by supplier reference and return its ID."""
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    from app.sage_client import find_sage_invoice_id
+    sage_id = find_sage_invoice_id(ref.strip(), contact_id)
+    return {"ref": ref, "sage_id": sage_id}
+
+
 @app.get("/sage/test-img2pdf")
 async def sage_test_img2pdf(request: Request) -> Dict[str, Any]:
     """Verify img2pdf is importable and can convert a minimal JPEG to PDF."""

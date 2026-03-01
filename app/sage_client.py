@@ -711,6 +711,36 @@ def sage_invoice_exists(invoice: InvoiceData) -> bool:
     )
 
 
+def find_sage_invoice_id(supplier_reference: str, contact_id: Optional[str] = None) -> Optional[str]:
+    """Search Sage purchase_invoices by supplier reference, return the Sage invoice ID or None."""
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing SAGE_BUSINESS_ID")
+    access_token = _refresh_access_token()
+    target = str(supplier_reference).strip().upper()
+    params_list: list[dict] = [{"search": supplier_reference, "items_per_page": 50}]
+    if contact_id:
+        params_list.insert(0, {"contact_id": contact_id, "vendor_reference": supplier_reference, "items_per_page": 50})
+        params_list.insert(1, {"contact_id": contact_id, "reference": supplier_reference, "items_per_page": 50})
+    for params in params_list:
+        try:
+            resp = requests.get(
+                f"{SAGE_API_BASE}/purchase_invoices",
+                headers=_sage_headers(access_token, business_id),
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                continue
+            for item in (resp.json().get("$items") or []):
+                for field in ("vendor_reference", "reference", "invoice_number", "displayed_as"):
+                    if str(item.get(field) or "").strip().upper() == target:
+                        return item.get("id")
+        except Exception:
+            continue
+    return None
+
+
 def attach_pdf_to_sage(
     context_type: str,
     context_id: str,
