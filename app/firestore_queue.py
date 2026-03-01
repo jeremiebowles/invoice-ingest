@@ -100,7 +100,7 @@ def find_records_by_reference(reference: str, limit: int = 20) -> list[Dict[str,
         return []
     col = _get_collection()
     results: list[Dict[str, Any]] = []
-    query = col.where("parsed.supplier_reference", "==", reference).limit(limit)
+    query = col.where("parsed.supplier_reference", "==", reference).order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
     for doc in query.stream():
         results.append({"id": doc.id, "data": doc.to_dict() or {}})
     return results
