@@ -1361,6 +1361,47 @@ async def sage_test_invoice_roundtrip(request: Request) -> Dict[str, Any]:
     }
 
 
+@app.post("/sage/attach-jpeg")
+async def sage_attach_jpeg(request: Request, sage_id: str, filename: Optional[str] = None) -> Dict[str, Any]:
+    """Accept a raw JPEG body, convert to PDF with img2pdf, and attach to a Sage purchase invoice.
+
+    Usage:
+        curl -u user:pass -X POST --data-binary @invoice.jpg \
+          -H "Content-Type: image/jpeg" \
+          ".../sage/attach-jpeg?sage_id=<id>&filename=IN06459.pdf"
+    """
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+
+    img_bytes = await request.body()
+    if not img_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty body — send JPEG bytes")
+
+    try:
+        import img2pdf  # type: ignore[import]
+        pdf_bytes = img2pdf.convert(img_bytes)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"img2pdf conversion failed: {exc}")
+
+    attach_name = filename or f"{sage_id[:8]}.pdf"
+    if not attach_name.lower().endswith(".pdf"):
+        attach_name = f"{attach_name}.pdf"
+
+    try:
+        result = attach_pdf_to_sage("purchase_invoice", sage_id.strip(), attach_name, pdf_bytes)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Sage attach failed: {exc}")
+
+    return {
+        "status": "ok",
+        "sage_id": sage_id,
+        "attachment_id": result.get("id"),
+        "file_name": result.get("file_name"),
+        "file_size": result.get("file_size"),
+    }
+
+
 @app.get("/sage/test-img2pdf")
 async def sage_test_img2pdf(request: Request) -> Dict[str, Any]:
     """Verify img2pdf is importable and can convert a minimal JPEG to PDF."""
