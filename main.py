@@ -1791,16 +1791,27 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                             sage_id_for_attach = img_sage_result["id"]
                             logger.info("Sage created id: %s", sage_id_for_attach)
                         elif skip_post and FIRESTORE_ENABLED:
-                            # Invoice already exists — find Sage ID from stored Firestore records
+                            # Invoice already exists — find Sage ID from stored Firestore records.
+                            # Prefer records whose stored Sage contact matches the current invoice
+                            # so we skip stale records from a different supplier (e.g. CLF phantom IDs).
                             try:
                                 existing_recs = find_records_by_reference(inv.supplier_reference)
                                 for existing_rec in existing_recs:
                                     existing_sage = (existing_rec.get("data") or {}).get("sage") or {}
                                     existing_sage_id = existing_sage.get("id")
-                                    if existing_sage_id:
-                                        sage_id_for_attach = existing_sage_id
-                                        logger.info("Found existing Sage id for attachment from Firestore: %s", sage_id_for_attach)
-                                        break
+                                    if not existing_sage_id:
+                                        continue
+                                    if inv.contact_id:
+                                        existing_contact_id = (existing_sage.get("contact") or {}).get("id")
+                                        if existing_contact_id and existing_contact_id != inv.contact_id:
+                                            logger.info(
+                                                "Skipping Firestore sage_id %s for attachment (contact mismatch: %s != %s)",
+                                                existing_sage_id, existing_contact_id, inv.contact_id,
+                                            )
+                                            continue
+                                    sage_id_for_attach = existing_sage_id
+                                    logger.info("Found existing Sage id for attachment from Firestore: %s", sage_id_for_attach)
+                                    break
                             except Exception as exc:
                                 logger.warning("Could not find Sage ID from Firestore for %s: %s", inv.supplier_reference, exc)
 
