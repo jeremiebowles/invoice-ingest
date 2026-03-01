@@ -1919,23 +1919,47 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                             reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
                             if not reserved:
                                 sage_exists = _sage_duplicate_exists(inv)
-                                dup_reason = "duplicate_sage" if sage_exists is True else "reference_locked"
-                                img_sage_result = {
-                                    "status": "skipped",
-                                    "reason": dup_reason,
-                                    "number": inv.supplier_reference,
-                                }
-                                skip_post = True
+                                if sage_exists is True:
+                                    img_sage_result = {
+                                        "status": "skipped",
+                                        "reason": "duplicate_sage",
+                                        "number": inv.supplier_reference,
+                                    }
+                                    skip_post = True
+                                elif sage_exists is False:
+                                    # Invoice was previously processed but no longer exists in Sage
+                                    # (e.g. deleted) — allow re-post
+                                    logger.info(
+                                        "Reference %s locked in Firestore but absent from Sage — re-posting",
+                                        inv.supplier_reference,
+                                    )
+                                else:
+                                    # Couldn't confirm Sage state — skip to be safe
+                                    img_sage_result = {
+                                        "status": "skipped",
+                                        "reason": "reference_locked",
+                                        "number": inv.supplier_reference,
+                                    }
+                                    skip_post = True
 
                         if not skip_post and _is_duplicate_post(inv):
                             sage_exists = _sage_duplicate_exists(inv)
-                            dup_reason = "duplicate_sage" if sage_exists is True else "duplicate_local"
-                            img_sage_result = {
-                                "status": "skipped",
-                                "reason": dup_reason,
-                                "number": inv.supplier_reference,
-                            }
-                            skip_post = True
+                            if sage_exists is True:
+                                img_sage_result = {
+                                    "status": "skipped",
+                                    "reason": "duplicate_sage",
+                                    "number": inv.supplier_reference,
+                                }
+                                skip_post = True
+                            elif sage_exists is not False:
+                                # Couldn't confirm Sage state — skip to be safe
+                                img_sage_result = {
+                                    "status": "skipped",
+                                    "reason": "duplicate_local",
+                                    "number": inv.supplier_reference,
+                                }
+                                skip_post = True
+                            # sage_exists is False: absent from Sage, fall through to re-post
 
                         if not skip_post:
                             if inv.is_credit:
