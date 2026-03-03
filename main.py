@@ -2286,3 +2286,119 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         "sage": sage_results if len(sage_results) > 1 else (sage_results[0] if sage_results else None),
         "record_id": record_ids if len(record_ids) > 1 else (record_ids[0] if record_ids else None),
     }
+
+
+@app.post("/manual/post-pdf")
+async def manual_post_pdf(request: Request) -> Dict[str, Any]:
+    """Process a raw PDF directly (admin use, bypasses forwarder whitelist)."""
+    _check_basic_auth(request)
+
+    content_type = request.headers.get("content-type", "")
+    if "application/pdf" not in content_type:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Content-Type must be application/pdf")
+
+    pdf_bytes = await request.body()
+    if not pdf_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty PDF body")
+
+    filename = request.headers.get("x-filename", "invoice.pdf")
+
+    text = extract_text_from_pdf(pdf_bytes)
+    _log_pdf_text(text)
+
+    invoices = _detect_and_parse(text, "", filename)
+    parsed_payloads = [_invoice_to_dict(inv) for inv in invoices]
+    logger.info("manual/post-pdf parsed: %s", parsed_payloads)
+
+    record_ids: list[str] = []
+    if FIRESTORE_ENABLED:
+        try:
+            for inv in invoices:
+                record_id = enqueue_record(
+                    {
+                        "status": "parsed",
+                        "source": "manual",
+                        "attachment": {"name": filename, "size": len(pdf_bytes)},
+                        "parsed": _serialize_for_storage(_invoice_to_dict(inv)),
+                    }
+                )
+                record_ids.append(record_id)
+        except Exception:
+            logger.exception("manual/post-pdf: Failed to write Firestore record")
+
+    sage_results: list[dict[str, Any] | None] = []
+    if SAGE_ENABLED:
+        for idx, inv in enumerate(invoices):
+            record_id = record_ids[idx] if idx < len(record_ids) else None
+            try:
+                if FIRESTORE_ENABLED:
+                    ref_date = (
+                        inv.invoice_date.isoformat()
+                        if hasattr(inv.invoice_date, "isoformat")
+                        else str(inv.invoice_date)
+                    )
+                    reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
+                    if not reserved:
+                        sage_exists = _sage_duplicate_exists(inv)
+                        if sage_exists is True:
+                            sage_result: dict[str, Any] = {"status": "skipped", "reason": "duplicate_sage", "number": inv.supplier_reference}
+                            if record_id:
+                                update_record(record_id, {"status": "skipped", "sage": sage_result})
+                            sage_results.append(sage_result)
+                            continue
+                        if sage_exists is None:
+                            sage_result = {"status": "skipped", "reason": "reference_locked", "number": inv.supplier_reference}
+                            if record_id:
+                                update_record(record_id, {"status": "skipped", "sage": sage_result})
+                            sage_results.append(sage_result)
+                            continue
+                if _is_duplicate_post(inv):
+                    sage_exists = _sage_duplicate_exists(inv)
+                    if sage_exists is True:
+                        sage_result = {"status": "skipped", "reason": "duplicate_sage", "number": inv.supplier_reference}
+                        if record_id:
+                            update_record(record_id, {"status": "skipped", "sage": sage_result})
+                        sage_results.append(sage_result)
+                        continue
+                    if sage_exists is None:
+                        sage_result = {"status": "skipped", "reason": "duplicate_local", "number": inv.supplier_reference}
+                        if record_id:
+                            update_record(record_id, {"status": "skipped", "sage": sage_result})
+                        sage_results.append(sage_result)
+                        continue
+                sage_result = post_purchase_credit_note(inv) if inv.is_credit else post_purchase_invoice(inv)
+                if isinstance(sage_result, dict) and sage_result.get("id"):
+                    try:
+                        attachment_result = attach_pdf_to_sage(
+                            "purchase_credit_note" if inv.is_credit else "purchase_invoice",
+                            sage_result["id"],
+                            filename,
+                            pdf_bytes,
+                        )
+                        sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
+                    except Exception as exc:
+                        logger.exception("manual/post-pdf: Failed to attach PDF")
+                        sage_result["attachment"] = {"status": "error", "message": str(exc)}
+                if record_id:
+                    if isinstance(sage_result, dict) and sage_result.get("id"):
+                        update_record(record_id, {"status": "posted", "sage": sage_result})
+                    elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+                        update_record(record_id, {"status": "skipped", "sage": sage_result})
+                    else:
+                        update_record(record_id, {"status": "unknown", "sage": sage_result})
+                sage_results.append(sage_result)
+            except Exception as exc:
+                logger.exception("manual/post-pdf: Sage post failed")
+                sage_result = {"status": "error", "message": str(exc)}
+                if record_id:
+                    update_record(record_id, {"status": "error", "error": str(exc)})
+                sage_results.append(sage_result)
+    else:
+        logger.info("Sage disabled; skipping post")
+
+    return {
+        "status": "ok",
+        "parsed": parsed_payloads if len(parsed_payloads) > 1 else (parsed_payloads[0] if parsed_payloads else None),
+        "sage": sage_results if len(sage_results) > 1 else (sage_results[0] if sage_results else None),
+        "record_id": record_ids if len(record_ids) > 1 else (record_ids[0] if record_ids else None),
+    }
