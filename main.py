@@ -49,6 +49,7 @@ from app.parsers.essential import parse_essential
 from app.parsers.lewtress import parse_lewtress
 from app.parsers.biocare import parse_biocare
 from app.parsers.kinetic import parse_kinetic
+from app.parsers.yu_energy import parse_yu_energy
 from app.parsers.hunts import parse_hunts
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_image, extract_text_from_pdf
@@ -572,6 +573,16 @@ def _text_looks_like_avogel(text: str) -> bool:
         or "vat no. 454 9330 37" in normalized
         or "vat no: 454 9330 37" in normalized
         or "sales i n voice" in normalized
+    )
+
+
+def _text_looks_like_yu_energy(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "yuenergy.co.uk" in normalized
+        or "yü energy" in normalized
+        or "yu energy retail" in normalized
+        or "236 2276 15" in normalized  # VAT number
     )
 
 
@@ -1798,6 +1809,8 @@ def _detect_and_parse(
         return [parse_biocare(text)]
     elif _text_looks_like_kinetic(text):
         return [parse_kinetic(text)]
+    elif _text_looks_like_yu_energy(text):
+        return [parse_yu_energy(text)]
     else:
         logger.warning("No supplier parser matched", extra={"sender": sender_email, "attachment": attachment_name})
         if raise_on_unknown:
