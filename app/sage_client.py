@@ -741,6 +741,25 @@ def find_sage_invoice_id(supplier_reference: str, contact_id: Optional[str] = No
     return None
 
 
+def search_sage_contacts(query: str) -> list[dict]:
+    """Search Sage contacts by name, return list of {id, name, reference}."""
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    if not business_id:
+        raise RuntimeError("Missing SAGE_BUSINESS_ID")
+    access_token = _refresh_access_token()
+    resp = requests.get(
+        f"{SAGE_API_BASE}/contacts",
+        headers=_sage_headers(access_token, business_id),
+        params={"search": query, "items_per_page": 20},
+        timeout=30,
+    )
+    _raise_for_status_with_body(resp, "Sage contacts search")
+    return [
+        {"id": c.get("id"), "name": c.get("name"), "reference": c.get("reference")}
+        for c in (resp.json().get("$items") or [])
+    ]
+
+
 def attach_pdf_to_sage(
     context_type: str,
     context_id: str,

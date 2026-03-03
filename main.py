@@ -1413,6 +1413,16 @@ async def sage_get_invoice_id(request: Request, ref: str, contact_id: Optional[s
     return {"ref": ref, "sage_id": sage_id}
 
 
+@app.get("/sage/contact-search")
+async def sage_contact_search(request: Request, q: str) -> Dict[str, Any]:
+    """Search Sage contacts by name."""
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    from app.sage_client import search_sage_contacts
+    return {"results": search_sage_contacts(q)}
+
+
 @app.get("/sage/test-img2pdf")
 async def sage_test_img2pdf(request: Request) -> Dict[str, Any]:
     """Verify img2pdf is importable and can convert a minimal JPEG to PDF."""
