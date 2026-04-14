@@ -1643,7 +1643,7 @@ async def sage_debug_search(request: Request, ref: str) -> Dict[str, Any]:
     ]:
         resp = _req.get(f"{SAGE_API_BASE}/purchase_invoices", headers=_sage_headers(access_token, business_id), params=params, timeout=30)
         items = resp.json().get("$items", []) if resp.status_code < 400 else []
-        results[label] = [{"id": i.get("id","")[:16], "ref": i.get("reference"), "vr": i.get("vendor_reference"), "disp": i.get("displayed_as")} for i in items[:5]]
+        results[label] = [{"id": i.get("id","")[:16], "ref": i.get("reference"), "vr": i.get("vendor_reference"), "disp": i.get("displayed_as"), "keys": list(i.keys())} for i in items[:5]]
     return {"status": "ok", "ref": ref, "results": results}
 
 
