@@ -877,66 +877,60 @@ async def sage_purchase_invoices_count(
 
 @app.get("/sage/avogel-audit")
 async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
-    """List all A.Vogel purchase invoices from Sage with their line amounts.
+    """Audit all A.Vogel purchase invoices by cross-referencing Firestore + Sage.
 
-    Pages through all purchase invoices, filters to A.Vogel by contact id,
-    then GETs each invoice individually (list items don't include invoice_lines).
-    Returns reference, date, total, and per-line net/tax/rate.
+    Queries Firestore for every posted A.Vogel record, looks each reference up
+    in Sage, and returns the invoice lines so zero-rated parsing errors can be spotted.
     """
     from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    from app.firestore_queue import _get_collection
     import requests as _req
     _check_basic_auth(request)
-    AVOGEL_CONTACT_ID = "1cc12fd2293c4eb48365ed85ccb5f2f6"
     business_id = _get_env("SAGE_BUSINESS_ID")
     access_token = _refresh_access_token()
     headers = _sage_headers(access_token, business_id)
 
-    # Step 1: page the list endpoint — items are stubs (only id/displayed_as/$path).
-    # A.Vogel invoice refs are plain 8-digit numbers (e.g. 01653176).
-    # Old manual invoices show as "DD/MM/YYYY - amount", so filter on digit-only displayed_as
-    # then confirm contact in the detail GET.
-    import re as _re
-    _ref_re = _re.compile(r"^\d{6,10}$")
-    avogel_ids: list[str] = []
-    page = 1
-    while True:
-        resp = _req.get(
-            f"{SAGE_API_BASE}/purchase_invoices",
-            headers=headers,
-            params={"items_per_page": 200, "page": page},
-            timeout=30,
-        )
-        if resp.status_code >= 400:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text[:500])
-        data = resp.json()
-        items = data.get("$items") or []
-        if not items:
-            break
-        for inv in items:
-            disp = (inv.get("displayed_as") or "").strip()
-            if _ref_re.match(disp):
-                inv_id = inv.get("id")
-                if inv_id:
-                    avogel_ids.append(inv_id)
-        total_pages = data.get("$total_pages") or 1
-        if page >= total_pages:
-            break
-        page += 1
+    # Step 1: get all A.Vogel references from Firestore (posted or skipped-duplicate)
+    col = _get_collection()
+    refs: set[str] = set()
+    for doc in col.where("parsed.supplier", "==", "A.Vogel").stream():
+        data = doc.to_dict() or {}
+        ref = (data.get("parsed") or {}).get("supplier_reference")
+        if ref and ref != "UNKNOWN":
+            refs.add(ref)
 
-    # Step 2: GET each candidate invoice to confirm contact and retrieve invoice_lines
+    # Step 2: for each reference look up the Sage invoice and fetch its lines
     invoices = []
-    for inv_id in avogel_ids:
-        resp = _req.get(
-            f"{SAGE_API_BASE}/purchase_invoices/{inv_id}",
-            headers=headers,
-            timeout=30,
-        )
+    for ref in sorted(refs):
+        # Find the Sage invoice ID via search
+        sage_id = None
+        for params in [
+            {"search": ref, "items_per_page": 10},
+        ]:
+            resp = _req.get(
+                f"{SAGE_API_BASE}/purchase_invoices",
+                headers=headers,
+                params=params,
+                timeout=30,
+            )
+            if resp.status_code >= 400:
+                continue
+            for item in (resp.json().get("$items") or []):
+                if (item.get("displayed_as") or "").strip() == ref:
+                    sage_id = item.get("id")
+                    break
+            if sage_id:
+                break
+
+        if not sage_id:
+            invoices.append({"reference": ref, "error": "not_found_in_sage"})
+            continue
+
+        resp = _req.get(f"{SAGE_API_BASE}/purchase_invoices/{sage_id}", headers=headers, timeout=30)
         if resp.status_code >= 400:
-            invoices.append({"id": inv_id, "error": resp.status_code})
+            invoices.append({"reference": ref, "error": resp.status_code})
             continue
         inv = resp.json()
-        if (inv.get("contact") or {}).get("id") != AVOGEL_CONTACT_ID:
-            continue
         lines = []
         for ln in (inv.get("invoice_lines") or []):
             lines.append({
@@ -946,14 +940,13 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
                 "tax_rate": (ln.get("tax_rate") or {}).get("displayed_as"),
             })
         invoices.append({
-            "reference": inv.get("vendor_reference") or inv.get("reference"),
+            "reference": ref,
             "date": inv.get("date"),
             "total": inv.get("total_amount"),
+            "status": (inv.get("status") or {}).get("id"),
             "lines": lines,
         })
 
-    # Sort by reference for easy reading
-    invoices.sort(key=lambda x: x.get("reference") or "")
     return {"status": "ok", "count": len(invoices), "invoices": invoices}
 
 
