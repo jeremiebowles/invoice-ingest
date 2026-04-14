@@ -879,9 +879,9 @@ async def sage_purchase_invoices_count(
 async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
     """List all A.Vogel purchase invoices from Sage with their line amounts.
 
-    Returns each invoice's reference, date, total, and per-line net/tax so that
-    zero-rated parsing errors can be spotted (wrong nonvat_net would appear as a
-    zero-rate line with a suspicious amount).
+    Pages through all purchase invoices, filters to A.Vogel by contact id,
+    then GETs each invoice individually (list items don't include invoice_lines).
+    Returns reference, date, total, and per-line net/tax/rate.
     """
     from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
     import requests as _req
@@ -891,13 +891,14 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
     access_token = _refresh_access_token()
     headers = _sage_headers(access_token, business_id)
 
-    invoices = []
+    # Step 1: collect all A.Vogel invoice IDs by paging the list endpoint
+    avogel_ids: list[str] = []
     page = 1
     while True:
         resp = _req.get(
             f"{SAGE_API_BASE}/purchase_invoices",
             headers=headers,
-            params={"contact_id": AVOGEL_CONTACT_ID, "items_per_page": 100, "page": page},
+            params={"items_per_page": 200, "page": page},
             timeout=30,
         )
         if resp.status_code >= 400:
@@ -907,25 +908,45 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
         if not items:
             break
         for inv in items:
-            lines = []
-            for ln in (inv.get("invoice_lines") or []):
-                lines.append({
-                    "net": ln.get("net_amount"),
-                    "tax": ln.get("tax_amount"),
-                    "total": ln.get("total_amount"),
-                    "tax_rate": (ln.get("tax_rate") or {}).get("displayed_as"),
-                })
-            invoices.append({
-                "reference": inv.get("vendor_reference") or inv.get("reference"),
-                "date": inv.get("date"),
-                "total": inv.get("total_amount"),
-                "lines": lines,
-            })
+            contact = inv.get("contact") or {}
+            if contact.get("id") == AVOGEL_CONTACT_ID:
+                inv_id = inv.get("id")
+                if inv_id:
+                    avogel_ids.append(inv_id)
         total_pages = data.get("$total_pages") or 1
         if page >= total_pages:
             break
         page += 1
 
+    # Step 2: GET each A.Vogel invoice individually to retrieve invoice_lines
+    invoices = []
+    for inv_id in avogel_ids:
+        resp = _req.get(
+            f"{SAGE_API_BASE}/purchase_invoices/{inv_id}",
+            headers=headers,
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            invoices.append({"id": inv_id, "error": resp.status_code})
+            continue
+        inv = resp.json()
+        lines = []
+        for ln in (inv.get("invoice_lines") or []):
+            lines.append({
+                "net": ln.get("net_amount"),
+                "tax": ln.get("tax_amount"),
+                "total": ln.get("total_amount"),
+                "tax_rate": (ln.get("tax_rate") or {}).get("displayed_as"),
+            })
+        invoices.append({
+            "reference": inv.get("vendor_reference") or inv.get("reference"),
+            "date": inv.get("date"),
+            "total": inv.get("total_amount"),
+            "lines": lines,
+        })
+
+    # Sort by reference for easy reading
+    invoices.sort(key=lambda x: x.get("reference") or "")
     return {"status": "ok", "count": len(invoices), "invoices": invoices}
 
 
