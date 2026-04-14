@@ -891,7 +891,12 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
     access_token = _refresh_access_token()
     headers = _sage_headers(access_token, business_id)
 
-    # Step 1: collect all A.Vogel invoice IDs by paging the list endpoint
+    # Step 1: page the list endpoint — items are stubs (only id/displayed_as/$path).
+    # A.Vogel invoice refs are plain 8-digit numbers (e.g. 01653176).
+    # Old manual invoices show as "DD/MM/YYYY - amount", so filter on digit-only displayed_as
+    # then confirm contact in the detail GET.
+    import re as _re
+    _ref_re = _re.compile(r"^\d{6,10}$")
     avogel_ids: list[str] = []
     page = 1
     while True:
@@ -908,8 +913,8 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
         if not items:
             break
         for inv in items:
-            contact = inv.get("contact") or {}
-            if contact.get("id") == AVOGEL_CONTACT_ID:
+            disp = (inv.get("displayed_as") or "").strip()
+            if _ref_re.match(disp):
                 inv_id = inv.get("id")
                 if inv_id:
                     avogel_ids.append(inv_id)
@@ -918,7 +923,7 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
             break
         page += 1
 
-    # Step 2: GET each A.Vogel invoice individually to retrieve invoice_lines
+    # Step 2: GET each candidate invoice to confirm contact and retrieve invoice_lines
     invoices = []
     for inv_id in avogel_ids:
         resp = _req.get(
@@ -930,6 +935,8 @@ async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
             invoices.append({"id": inv_id, "error": resp.status_code})
             continue
         inv = resp.json()
+        if (inv.get("contact") or {}).get("id") != AVOGEL_CONTACT_ID:
+            continue
         lines = []
         for ln in (inv.get("invoice_lines") or []):
             lines.append({
