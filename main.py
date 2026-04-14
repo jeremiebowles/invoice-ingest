@@ -875,6 +875,60 @@ async def sage_purchase_invoices_count(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
 
 
+@app.get("/sage/avogel-audit")
+async def sage_avogel_audit(request: Request) -> Dict[str, Any]:
+    """List all A.Vogel purchase invoices from Sage with their line amounts.
+
+    Returns each invoice's reference, date, total, and per-line net/tax so that
+    zero-rated parsing errors can be spotted (wrong nonvat_net would appear as a
+    zero-rate line with a suspicious amount).
+    """
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    _check_basic_auth(request)
+    AVOGEL_CONTACT_ID = "1cc12fd2293c4eb48365ed85ccb5f2f6"
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    access_token = _refresh_access_token()
+    headers = _sage_headers(access_token, business_id)
+
+    invoices = []
+    page = 1
+    while True:
+        resp = _req.get(
+            f"{SAGE_API_BASE}/purchase_invoices",
+            headers=headers,
+            params={"contact_id": AVOGEL_CONTACT_ID, "items_per_page": 100, "page": page},
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text[:500])
+        data = resp.json()
+        items = data.get("$items") or []
+        if not items:
+            break
+        for inv in items:
+            lines = []
+            for ln in (inv.get("invoice_lines") or []):
+                lines.append({
+                    "net": ln.get("net_amount"),
+                    "tax": ln.get("tax_amount"),
+                    "total": ln.get("total_amount"),
+                    "tax_rate": (ln.get("tax_rate") or {}).get("displayed_as"),
+                })
+            invoices.append({
+                "reference": inv.get("vendor_reference") or inv.get("reference"),
+                "date": inv.get("date"),
+                "total": inv.get("total_amount"),
+                "lines": lines,
+            })
+        total_pages = data.get("$total_pages") or 1
+        if page >= total_pages:
+            break
+        page += 1
+
+    return {"status": "ok", "count": len(invoices), "invoices": invoices}
+
+
 @app.get("/debug/duplicate-reason")
 async def debug_duplicate_reason(
     request: Request,

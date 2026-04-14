@@ -19,15 +19,18 @@ def _extract_invoice_date(text: str) -> Optional[str]:
 
 
 def _extract_zero_and_standard_nets(text: str) -> tuple[Optional[float], Optional[float]]:
+    # Scope search to the VAT NET summary block to avoid matching line-item columns
+    block_match = re.search(r"VAT\s+NET(.+?)Sub\s*Total:", text, re.IGNORECASE | re.DOTALL)
+    if not block_match:
+        return None, None
+    block = block_match.group(1)
+
     zero_net = None
     standard_net = None
-    # "Zero Rated 6.55" or "Zero Rated\n6.55"
-    m = re.search(r"Zero\s+Rated\s+([\d.,]+)", text, re.IGNORECASE)
+    m = re.search(r"Zero\s+Rated\s+([\d.,]+)", block, re.IGNORECASE)
     if m:
         zero_net = parse_money(m.group(1))
-    # "20% 161.74" in the VAT NET summary (not the line-item VAT Rate column)
-    # Look for "20%" followed by a number in the VAT NET block
-    for m in re.finditer(r"^20%\s+([\d.,]+)", text, re.MULTILINE):
+    for m in re.finditer(r"20%\s+([\d.,]+)", block):
         val = parse_money(m.group(1))
         if val is not None:
             standard_net = val
