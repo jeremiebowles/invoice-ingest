@@ -8,8 +8,12 @@ from app.parse_utils import approx_equal, parse_date, parse_money, extract_deliv
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    # "INVOICE CPC139"
-    match = re.search(r"INVOICE\s+(CPC\d+)", text or "", flags=re.IGNORECASE)
+    # "INVOICE CPC139" or "INVOICE CPCO-1320"
+    match = re.search(r"INVOICE\s+(CPC[A-Z0-9-]+)", text or "", flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    # Fallback: "Payment Reference: CPCO-1320"
+    match = re.search(r"Payment Reference[:\s]+(CPC[A-Z0-9-]+)", text or "", flags=re.IGNORECASE)
     return match.group(1).strip() if match else None
 
 
