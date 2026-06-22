@@ -471,6 +471,61 @@ def _extract_pdf_from_raw_email(payload: Dict[str, Any]) -> Optional[Dict[str, A
     return None
 
 
+def _find_all_pdf_attachments(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Return all non-statement PDF attachments from the Postmark payload with ContentBytes decoded."""
+    attachments = payload.get("Attachments") or []
+    if not isinstance(attachments, list):
+        return []
+    results: list[Dict[str, Any]] = []
+    for attachment in attachments:
+        if not isinstance(attachment, dict):
+            continue
+        content_type = (attachment.get("ContentType") or "").lower()
+        name = attachment.get("Name") or ""
+        if "pdf" in content_type or name.lower().endswith(".pdf"):
+            if _is_statement_filename(name):
+                continue
+            content = attachment.get("Content")
+            if content:
+                try:
+                    pdf_bytes = base64.b64decode(content)
+                    results.append({"Name": name, "ContentType": content_type, "ContentBytes": pdf_bytes})
+                except Exception:
+                    logger.warning("Failed to decode PDF attachment: %s", name)
+    return results
+
+
+def _extract_all_pdfs_from_raw_email(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    """Extract all non-statement PDF attachments from a raw MIME email in the Postmark payload."""
+    raw = payload.get("RawEmail") or payload.get("RawMessage") or payload.get("RawSource")
+    if not raw:
+        return []
+    raw_bytes = raw if isinstance(raw, (bytes, bytearray)) else str(raw).encode("utf-8", errors="ignore")
+    for attempt in range(2):
+        try:
+            msg = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+        except Exception:
+            msg = None
+        if msg:
+            results: list[Dict[str, Any]] = []
+            for part in msg.walk():
+                content_type = (part.get_content_type() or "").lower()
+                filename = part.get_filename() or "attachment.pdf"
+                if "pdf" in content_type or filename.lower().endswith(".pdf"):
+                    if _is_statement_filename(filename):
+                        continue
+                    payload_bytes = part.get_payload(decode=True)
+                    if payload_bytes:
+                        results.append({"Name": filename, "ContentType": content_type, "ContentBytes": payload_bytes})
+            return results
+        if attempt == 0 and isinstance(raw, str):
+            try:
+                raw_bytes = base64.b64decode(raw, validate=False)
+            except Exception:
+                break
+    return []
+
+
 def _extract_images_from_raw_email(payload: Dict[str, Any]) -> list[Dict[str, Any]]:
     """Extract image attachments from a raw MIME email in the Postmark payload."""
     raw = payload.get("RawEmail") or payload.get("RawMessage") or payload.get("RawSource")
@@ -1982,10 +2037,11 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         except Exception:
             logger.exception("Failed to reserve message_id; continuing")
 
-    pdf_attachment = _find_first_pdf_attachment(payload)
-    raw_pdf_attachment = None if pdf_attachment else _extract_pdf_from_raw_email(payload)
+    all_pdfs = _find_all_pdf_attachments(payload)
+    if not all_pdfs:
+        all_pdfs = _extract_all_pdfs_from_raw_email(payload)
 
-    if not pdf_attachment and not raw_pdf_attachment:
+    if not all_pdfs:
         # Try image attachments via OCR before giving up.
         image_attachments = _find_image_attachments(payload)
         if not image_attachments:
@@ -2213,28 +2269,6 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
             "source": "image_ocr",
         }
 
-    if raw_pdf_attachment:
-        pdf_bytes = raw_pdf_attachment["ContentBytes"]
-        pdf_attachment = {
-            "Name": raw_pdf_attachment.get("Name"),
-            "ContentType": raw_pdf_attachment.get("ContentType"),
-            "ContentLength": len(pdf_bytes),
-        }
-        logger.info("Extracted PDF from RawEmail: %s", pdf_attachment.get("Name"))
-    else:
-        content = pdf_attachment.get("Content")
-        if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PDF attachment missing content")
-
-        try:
-            pdf_bytes = base64.b64decode(content)
-        except (ValueError, TypeError) as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid base64 content") from exc
-        logger.info("Extracted PDF from attachment content: %s", pdf_attachment.get("Name"))
-
-    text = extract_text_from_pdf(pdf_bytes)
-    _log_pdf_text(text)
-
     sender_email = _extract_sender_email(payload) or ""
     _enforce_blocklist(payload.get("Subject") or "")
     _enforce_forwarder_whitelist(sender_email)
@@ -2245,50 +2279,97 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
         (payload.get("FromFull") or {}).get("Email"),
         payload.get("OriginalSender"),
     )
-    invoices = _detect_and_parse(text, sender_email, pdf_attachment.get("Name") or "" if pdf_attachment else "")
 
-    parsed_payloads = [_invoice_to_dict(inv) for inv in invoices]
-    logger.info("Parsed invoice data: %s", parsed_payloads)
-
+    parsed_payloads: list[Any] = []
     record_ids: list[str] = []
-    if FIRESTORE_ENABLED:
-        try:
-            for inv in invoices:
-                record_id = enqueue_record(
-                    {
-                        "status": "parsed",
-                        "source": "postmark",
-                        "payload_meta": _payload_meta(payload),
-                        "attachment": _attachment_meta(pdf_attachment, len(pdf_bytes)),
-                        "parsed": _serialize_for_storage(_invoice_to_dict(inv)),
-                    }
-                )
-                record_ids.append(record_id)
-                logger.info("Enqueued Firestore record: %s", record_id)
-        except Exception:
-            logger.exception("Failed to write Firestore record")
-
     sage_results: list[dict[str, Any] | None] = []
-    if SAGE_ENABLED:
-        for idx, inv in enumerate(invoices):
-            record_id = record_ids[idx] if idx < len(record_ids) else None
+
+    for pdf_info in all_pdfs:
+        pdf_bytes = pdf_info["ContentBytes"]
+        pdf_name = pdf_info.get("Name") or ""
+        logger.info("Processing PDF: %s (%d bytes)", pdf_name, len(pdf_bytes))
+
+        text = extract_text_from_pdf(pdf_bytes)
+        _log_pdf_text(text)
+
+        invoices = _detect_and_parse(text, sender_email, pdf_name, raise_on_unknown=False)
+        if invoices is None:
+            logger.warning("No supplier matched for PDF: %s", pdf_name)
+            continue
+
+        pdf_parsed = [_invoice_to_dict(inv) for inv in invoices]
+        parsed_payloads.extend(pdf_parsed)
+        logger.info("Parsed invoice data from %s: %s", pdf_name, pdf_parsed)
+
+        this_pdf_record_ids: list[str] = []
+        if FIRESTORE_ENABLED:
             try:
-                if FIRESTORE_ENABLED:
-                    ref_date = (
-                        inv.invoice_date.isoformat()
-                        if hasattr(inv.invoice_date, "isoformat")
-                        else str(inv.invoice_date)
+                for inv in invoices:
+                    record_id = enqueue_record(
+                        {
+                            "status": "parsed",
+                            "source": "postmark",
+                            "payload_meta": _payload_meta(payload),
+                            "attachment": _attachment_meta(pdf_info, len(pdf_bytes)),
+                            "parsed": _serialize_for_storage(_invoice_to_dict(inv)),
+                        }
                     )
-                    reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
-                    if not reserved:
-                        logger.info(
-                            "Duplicate reference lock detected",
-                            extra={
-                                "supplier_reference": inv.supplier_reference,
-                                "invoice_date": ref_date,
-                                "is_credit": inv.is_credit,
-                            },
+                    this_pdf_record_ids.append(record_id)
+                    record_ids.append(record_id)
+                    logger.info("Enqueued Firestore record: %s", record_id)
+            except Exception:
+                logger.exception("Failed to write Firestore record")
+
+        if SAGE_ENABLED:
+            for idx, inv in enumerate(invoices):
+                record_id = this_pdf_record_ids[idx] if idx < len(this_pdf_record_ids) else None
+                try:
+                    if FIRESTORE_ENABLED:
+                        ref_date = (
+                            inv.invoice_date.isoformat()
+                            if hasattr(inv.invoice_date, "isoformat")
+                            else str(inv.invoice_date)
                         )
+                        reserved = reserve_reference(inv.supplier_reference, ref_date, inv.is_credit)
+                        if not reserved:
+                            logger.info(
+                                "Duplicate reference lock detected",
+                                extra={
+                                    "supplier_reference": inv.supplier_reference,
+                                    "invoice_date": ref_date,
+                                    "is_credit": inv.is_credit,
+                                },
+                            )
+                            sage_exists = _sage_duplicate_exists(inv)
+                            if sage_exists is True:
+                                duplicate = _duplicate_payload(inv, "duplicate_sage")
+                                sage_result = {
+                                    "status": "skipped",
+                                    "reason": "duplicate_sage",
+                                    "number": inv.supplier_reference,
+                                }
+                                if record_id:
+                                    update_record(
+                                        record_id,
+                                        {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                                    )
+                                sage_results.append(sage_result)
+                                continue
+                            if sage_exists is None:
+                                duplicate = _duplicate_payload(inv, "reference_locked")
+                                sage_result = {
+                                    "status": "skipped",
+                                    "reason": "reference_locked",
+                                    "number": inv.supplier_reference,
+                                }
+                                if record_id:
+                                    update_record(
+                                        record_id,
+                                        {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
+                                    )
+                                sage_results.append(sage_result)
+                                continue
+                    if _is_duplicate_post(inv):
                         sage_exists = _sage_duplicate_exists(inv)
                         if sage_exists is True:
                             duplicate = _duplicate_payload(inv, "duplicate_sage")
@@ -2305,10 +2386,10 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                             sage_results.append(sage_result)
                             continue
                         if sage_exists is None:
-                            duplicate = _duplicate_payload(inv, "reference_locked")
+                            duplicate = _duplicate_payload(inv, "duplicate_local")
                             sage_result = {
                                 "status": "skipped",
-                                "reason": "reference_locked",
+                                "reason": "duplicate_local",
                                 "number": inv.supplier_reference,
                             }
                             if record_id:
@@ -2318,76 +2399,50 @@ async def postmark_inbound(request: Request) -> Dict[str, Any]:
                                 )
                             sage_results.append(sage_result)
                             continue
-                if _is_duplicate_post(inv):
-                    sage_exists = _sage_duplicate_exists(inv)
-                    if sage_exists is True:
-                        duplicate = _duplicate_payload(inv, "duplicate_sage")
-                        sage_result = {
-                            "status": "skipped",
-                            "reason": "duplicate_sage",
-                            "number": inv.supplier_reference,
-                        }
-                        if record_id:
-                            update_record(
-                                record_id,
-                                {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
-                            )
-                        sage_results.append(sage_result)
-                        continue
-                    if sage_exists is None:
-                        duplicate = _duplicate_payload(inv, "duplicate_local")
-                        sage_result = {
-                            "status": "skipped",
-                            "reason": "duplicate_local",
-                            "number": inv.supplier_reference,
-                        }
-                        if record_id:
-                            update_record(
-                                record_id,
-                                {"status": "skipped", "sage": sage_result, "duplicate": duplicate},
-                            )
-                        sage_results.append(sage_result)
-                        continue
-                if inv.is_credit:
-                    sage_result = post_purchase_credit_note(inv)
-                else:
-                    sage_result = post_purchase_invoice(inv)
-                if isinstance(sage_result, dict):
-                    if sage_result.get("id"):
-                        logger.info("Sage created id: %s", sage_result.get("id"))
-                    elif sage_result.get("status") == "skipped":
-                        logger.info("Sage post skipped: %s", sage_result)
-                if isinstance(sage_result, dict) and sage_result.get("id"):
-                    try:
-                        attachment_result = attach_pdf_to_sage(
-                            "purchase_credit_note" if inv.is_credit else "purchase_invoice",
-                            sage_result["id"],
-                            pdf_attachment.get("Name") if pdf_attachment else None,
-                            pdf_bytes,
-                        )
-                        logger.info("Attached PDF to Sage id: %s", sage_result.get("id"))
-                        sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
-                    except Exception as exc:
-                        logger.exception("Failed to attach PDF to Sage: %s", exc)
-                        sage_result["attachment"] = {"status": "error", "message": str(exc)}
-                if record_id:
-                    if isinstance(sage_result, dict) and sage_result.get("id"):
-                        update_record(record_id, {"status": "posted", "sage": sage_result})
-                    elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
-                        update_record(record_id, {"status": "skipped", "sage": sage_result})
+                    if inv.is_credit:
+                        sage_result = post_purchase_credit_note(inv)
                     else:
-                        update_record(record_id, {"status": "unknown", "sage": sage_result})
-                sage_results.append(sage_result)
-            except Exception as exc:
-                logger.exception("Sage post failed: %s", exc)
-                sage_result = {"status": "error", "message": str(exc)}
-                if record_id:
-                    update_record(record_id, {"status": "error", "error": str(exc)})
-                sage_results.append(sage_result)
-    else:
-        logger.info("Sage disabled; skipping post")
-        for record_id in record_ids:
-            update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+                        sage_result = post_purchase_invoice(inv)
+                    if isinstance(sage_result, dict):
+                        if sage_result.get("id"):
+                            logger.info("Sage created id: %s", sage_result.get("id"))
+                        elif sage_result.get("status") == "skipped":
+                            logger.info("Sage post skipped: %s", sage_result)
+                    if isinstance(sage_result, dict) and sage_result.get("id"):
+                        try:
+                            attachment_result = attach_pdf_to_sage(
+                                "purchase_credit_note" if inv.is_credit else "purchase_invoice",
+                                sage_result["id"],
+                                pdf_name or None,
+                                pdf_bytes,
+                            )
+                            logger.info("Attached PDF to Sage id: %s", sage_result.get("id"))
+                            sage_result["attachment"] = {"status": "ok", "id": attachment_result.get("id")}
+                        except Exception as exc:
+                            logger.exception("Failed to attach PDF to Sage: %s", exc)
+                            sage_result["attachment"] = {"status": "error", "message": str(exc)}
+                    if record_id:
+                        if isinstance(sage_result, dict) and sage_result.get("id"):
+                            update_record(record_id, {"status": "posted", "sage": sage_result})
+                        elif isinstance(sage_result, dict) and sage_result.get("status") == "skipped":
+                            update_record(record_id, {"status": "skipped", "sage": sage_result})
+                        else:
+                            update_record(record_id, {"status": "unknown", "sage": sage_result})
+                    sage_results.append(sage_result)
+                except Exception as exc:
+                    logger.exception("Sage post failed: %s", exc)
+                    sage_result = {"status": "error", "message": str(exc)}
+                    if record_id:
+                        update_record(record_id, {"status": "error", "error": str(exc)})
+                    sage_results.append(sage_result)
+        else:
+            logger.info("Sage disabled; skipping post for %s", pdf_name)
+            for record_id in this_pdf_record_ids:
+                update_record(record_id, {"status": "queued", "reason": "sage_disabled"})
+
+    if not parsed_payloads:
+        logger.warning("No supplier parser matched for any PDF in the email; sender=%s", sender_email)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported supplier")
 
     if FIRESTORE_ENABLED and message_id:
         try:
