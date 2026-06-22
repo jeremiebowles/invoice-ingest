@@ -51,6 +51,10 @@ from app.parsers.biocare import parse_biocare
 from app.parsers.kinetic import parse_kinetic
 from app.parsers.yu_energy import parse_yu_energy
 from app.parsers.hunts import parse_hunts
+from app.parsers.scott_fps import parse_scott_fps
+from app.parsers.feel_supreme import parse_feel_supreme
+from app.parsers.blas_ar_fwyd import parse_blas_ar_fwyd
+from app.parsers.crafty_pickle import parse_crafty_pickle
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_image, extract_text_from_pdf
 from app.sage_client import (
@@ -620,6 +624,34 @@ def _text_looks_like_kinetic(text: str) -> bool:
     )
 
 
+def _text_looks_like_crafty_pickle(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "crafty pickle" in normalized
+        or "thecraftypickle.co.uk" in normalized
+        or "354887354" in normalized
+    )
+
+
+def _text_looks_like_blas_ar_fwyd(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "blas ar fwyd" in normalized
+        or "blasarfwyd.com" in normalized
+        or "489 8839 50" in normalized
+        or "489883950" in normalized
+    )
+
+
+def _text_looks_like_feel_supreme(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "feel supreme" in normalized
+        or "feelsupreme.co.uk" in normalized
+        or "309164020" in normalized
+    )
+
+
 def _text_looks_like_absolute_aromas(text: str) -> bool:
     normalized = (text or "").lower()
     return (
@@ -660,6 +692,15 @@ def _text_looks_like_nestle(text: str) -> bool:
         or "nestlé" in normalized
         or "nestle uk" in normalized
         or "vat reg no" in normalized and "nestle" in normalized
+    )
+
+
+def _text_looks_like_scott_fps(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "scottfps" in normalized
+        or "scott fps" in normalized
+        or "153790594" in normalized
     )
 
 
@@ -1839,6 +1880,8 @@ def _detect_and_parse(
     is_viridian_sender = sender_email.endswith("@viridian-nutrition.com")
     is_hunts_sender = sender_email.endswith("@huntsfoodgroup.co.uk")
     is_essential_sender = sender_email.endswith("@essential-trading.coop")
+    is_feel_supreme_sender = sender_email.endswith("@feelsupreme.co.uk")
+    is_blas_sender = sender_email.endswith("@blasarfwyd.com")
 
     if is_hunts_sender or _text_looks_like_hunts(text):
         if not is_hunts_sender:
@@ -1862,6 +1905,8 @@ def _detect_and_parse(
         return [parse_watson_pratt(text)]
     elif _text_looks_like_nestle(text):
         return [parse_nestle(text)]
+    elif _text_looks_like_scott_fps(text):
+        return [parse_scott_fps(text)]
     elif _text_looks_like_natures_plus(text):
         return [parse_natures_plus(text)]
     elif _text_looks_like_bionature(text):
@@ -1886,6 +1931,12 @@ def _detect_and_parse(
         return [parse_kinetic(text)]
     elif _text_looks_like_yu_energy(text):
         return [parse_yu_energy(text)]
+    elif is_feel_supreme_sender or _text_looks_like_feel_supreme(text):
+        return [parse_feel_supreme(text)]
+    elif is_blas_sender or _text_looks_like_blas_ar_fwyd(text):
+        return [parse_blas_ar_fwyd(text)]
+    elif _text_looks_like_crafty_pickle(text):
+        return [parse_crafty_pickle(text)]
     else:
         logger.warning("No supplier parser matched", extra={"sender": sender_email, "attachment": attachment_name})
         if raise_on_unknown:
