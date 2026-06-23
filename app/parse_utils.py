@@ -75,6 +75,7 @@ POSTCODE_RE = re.compile(
 
 LEDGER_MAP: dict[str, int] = {
     "CF10 1AE": 5001,
+    "CF24 2AP": 5002,
     "CF24 3LP": 5002,
     "CF11 9DX": 5004,
 }
