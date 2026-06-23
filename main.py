@@ -55,6 +55,7 @@ from app.parsers.scott_fps import parse_scott_fps
 from app.parsers.feel_supreme import parse_feel_supreme
 from app.parsers.blas_ar_fwyd import parse_blas_ar_fwyd
 from app.parsers.crafty_pickle import parse_crafty_pickle
+from app.parsers.cress import parse_cress
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_image, extract_text_from_pdf
 from app.sage_client import (
@@ -685,6 +686,15 @@ def _text_looks_like_crafty_pickle(text: str) -> bool:
         "crafty pickle" in normalized
         or "thecraftypickle.co.uk" in normalized
         or "354887354" in normalized
+    )
+
+
+def _text_looks_like_cress(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "cress ltd" in normalized
+        or "cressuk.com" in normalized
+        or "802 5891 32" in normalized
     )
 
 
@@ -1992,6 +2002,8 @@ def _detect_and_parse(
         return [parse_blas_ar_fwyd(text)]
     elif _text_looks_like_crafty_pickle(text):
         return [parse_crafty_pickle(text)]
+    elif _text_looks_like_cress(text):
+        return [parse_cress(text)]
     else:
         logger.warning("No supplier parser matched", extra={"sender": sender_email, "attachment": attachment_name})
         if raise_on_unknown:
