@@ -122,6 +122,87 @@ aws lambda invoke --region eu-west-2 \
   --payload file:///tmp/lambda-test-event.json /tmp/lambda-invoke-output.json
 ```
 
+## Deploying Code Changes
+
+### Standard deploy procedure
+
+Always deploy with `--no-traffic` first, verify, then cut over.
+
+```bash
+# 1. Build and create new revision (no traffic yet)
+gcloud run deploy invoice-ingest \
+  --source . \
+  --region europe-west1 \
+  --no-traffic
+
+# 2. Check the new revision started cleanly
+gcloud logging read 'resource.type=cloud_run_revision AND resource.labels.service_name=invoice-ingest' \
+  --limit=20 --format=json
+
+# 3. Verify health and Sage connectivity
+curl -u user:PASSWORD "https://invoice-ingest-262398202422.europe-west1.run.app/health"
+curl -u user:PASSWORD "https://invoice-ingest-262398202422.europe-west1.run.app/sage/test-refresh"
+
+# 4. Cut traffic over (replace revision name with actual)
+gcloud run services update-traffic invoice-ingest \
+  --region=europe-west1 \
+  --to-revisions=invoice-ingest-XXXXX-xxx=100
+```
+
+### Retrieving Basic Auth credentials
+BASIC_USER and BASIC_PASS live in the Cloud Run env vars — no need to look them up elsewhere:
+```bash
+gcloud run services describe invoice-ingest --region=europe-west1 --format=json \
+  | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+envs = {e['name']: e.get('value','') for e in data['spec']['template']['spec']['containers'][0].get('env', []) if 'value' in e}
+print('BASIC_USER:', envs.get('BASIC_USER'))
+print('BASIC_PASS:', envs.get('BASIC_PASS'))
+"
+```
+
+### Rolling back
+```bash
+# List recent revisions
+gcloud run revisions list --service=invoice-ingest --region=europe-west1 --format="value(name)" | head -5
+
+# Route traffic back to a known-good revision
+gcloud run services update-traffic invoice-ingest \
+  --region=europe-west1 \
+  --to-revisions=invoice-ingest-XXXXX-xxx=100
+```
+
+### Adding a new supplier parser
+1. Create `app/parsers/<supplier>.py` with a `parse_<supplier>(text: str) -> InvoiceData` function.
+2. Look up the Sage contact ID:
+   ```bash
+   curl -u user:PASSWORD \
+     "https://invoice-ingest-262398202422.europe-west1.run.app/sage/contacts/search?q=Supplier+Name"
+   ```
+   Use the returned `id` as `contact_id` in the parser.
+3. Add `_text_looks_like_<supplier>()` detection function to `main.py`.
+4. Add the import and `elif` branch to `_detect_and_parse()` in `main.py`.
+5. Deploy using the standard procedure above.
+
+### Python / buildpack compatibility (important)
+The Cloud Build buildpack (`google-24-full`) automatically picks the latest Python version.
+As of June 2026 this is **Python 3.14**, which breaks `google-cloud-firestore` /
+`google-cloud-secret-manager` at startup with:
+```
+TypeError: Metaclasses with custom tp_new are not supported.
+```
+The service crash-loops silently — no requests are served and no Firestore records are written.
+
+**Fix applied (June 2026):** `.python-version` pins the runtime to `3.13`. This is confirmed
+working. The buildpack available versions on `ubuntu2404` are `3.13.x` and `3.14.x` only —
+**3.12 is not available** and will cause a build failure if specified.
+
+If a future deployment crashes with this error, check `.python-version` is still present
+and set to a 3.13.x-compatible value. If the buildpack drops 3.13 support and forces 3.14+,
+the alternative is to bump the Google Cloud package versions in `requirements.txt` until
+a protobuf release adds Python 3.14 compatibility.
+
 ## Sage Refresh Token Rotation (Summary)
 1. Get auth URL: `GET /sage/auth-url` (Basic Auth required).
 2. Use browser to authorize, capture `code` from redirect.
