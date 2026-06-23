@@ -20,7 +20,7 @@ def _extract_delivery_block(text: str) -> Optional[str]:
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    match = re.search(r"Invoice\s+No:\s*([A-Z0-9-]+)", text, flags=re.IGNORECASE)
+    match = re.search(r"Invoice\s+No:?\s*([A-Z0-9-]+)", text, flags=re.IGNORECASE)
     return match.group(1).strip() if match else None
 
 
@@ -73,7 +73,9 @@ def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], 
         if re.search(r"^Terms:", line, flags=re.IGNORECASE):
             break
         # Match T-code lines: T1 20.00 178.09 35.62
-        m = re.match(r"^(T\d+)\s+([\d.]+)\s+([\d.,]+)\s+([\d.,]+)", line)
+        # Special instructions may precede the T-code on the same line, so search
+        # rather than anchoring at the start, e.g. "thank you T1 20.00 36.01 7.20"
+        m = re.search(r"\b(T\d+)\s+([\d.]+)\s+([\d.,]+)\s+([\d.,]+)\s*$", line)
         if m:
             code = m.group(1).upper()
             rate = parse_money(m.group(2))
