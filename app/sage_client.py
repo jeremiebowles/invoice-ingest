@@ -64,10 +64,19 @@ def _store_refresh_token(refresh_token: str) -> None:
     if not secret_name:
         return
     client = secretmanager.SecretManagerServiceClient()
-    client.add_secret_version(
+    new_version = client.add_secret_version(
         parent=secret_name,
         payload={"data": refresh_token.encode("utf-8")},
     )
+    # Disable all previous versions so we don't accumulate billable versions.
+    new_version_id = new_version.name.split("/")[-1]
+    try:
+        for version in client.list_secret_versions(parent=secret_name):
+            vid = version.name.split("/")[-1]
+            if vid != new_version_id and version.state.name == "ENABLED":
+                client.disable_secret_version(name=version.name)
+    except Exception:
+        logger.warning("Failed to disable old secret versions; continuing")
 
 
 def _acquire_token_lock() -> bool:
