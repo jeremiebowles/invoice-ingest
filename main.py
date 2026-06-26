@@ -58,6 +58,7 @@ from app.parsers.crafty_pickle import parse_crafty_pickle
 from app.parsers.cress import parse_cress
 from app.parsers.dr_organic import parse_dr_organic
 from app.parsers.pravera import parse_pravera
+from app.parsers.sj_may_refrigeration import parse_sj_may_refrigeration
 from app.parse_utils import parse_date
 from app.pdf_text import extract_text_from_image, extract_text_from_pdf
 from app.sage_client import (
@@ -697,6 +698,15 @@ def _text_looks_like_cress(text: str) -> bool:
         "cress ltd" in normalized
         or "cressuk.com" in normalized
         or "802 5891 32" in normalized
+    )
+
+
+def _text_looks_like_sj_may_refrigeration(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "mayrefrigeration" in normalized
+        or "s&j may" in normalized
+        or "3965960" in normalized
     )
 
 
@@ -2023,6 +2033,8 @@ def _detect_and_parse(
         return [parse_crafty_pickle(text)]
     elif _text_looks_like_cress(text):
         return [parse_cress(text)]
+    elif _text_looks_like_sj_may_refrigeration(text):
+        return [parse_sj_may_refrigeration(text)]
     elif _text_looks_like_pravera(text):
         return [parse_pravera(text)]
     elif _text_looks_like_dr_organic(text):
