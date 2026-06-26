@@ -183,7 +183,7 @@ def _extract_vat_analysis_new_format(text: str) -> tuple[Optional[float], Option
         if vat_val is not None:
             vat_amount += vat_val
 
-    total_m = re.search(r"Total Amount:\s*GBP\s*([\d,]+\.[\d]{2})", text, re.IGNORECASE)
+    total_m = re.search(r"Total Amount:?\s*GBP\s*([\d,]+\.[\d]{2})", text, re.IGNORECASE)
     total = parse_money(total_m.group(1)) if total_m else None
 
     if not found:
