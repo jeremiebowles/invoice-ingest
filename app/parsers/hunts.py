@@ -31,19 +31,24 @@ def _extract_delivery_postcode_hunts(text: str) -> Optional[str]:
 
 
 def _extract_invoice_number(text: str) -> Optional[str]:
-    """Extract Hunts invoice number in format 510-NNNNNN."""
+    """Extract Hunts invoice/credit note number."""
+    # Old format: 510-123456
     match = re.search(r"\b(\d{3}-\d{6})\b", text)
-    return match.group(1) if match else None
+    if match:
+        return match.group(1)
+    # New format: "Credit Note Number  Credit Note Date  Page\n23818  26/06/2026  1/1"
+    match = re.search(r"(?:Credit Note Number|Invoice Number)\b[^\n]*\n\s*(\d+)", text, re.IGNORECASE)
+    return match.group(1).strip() if match else None
 
 
 def _extract_tax_point_date(text: str) -> Optional[str]:
-    """Extract Tax Point Date from Hunts header.
+    """Extract invoice/credit note date from Hunts header.
 
     pdfplumber often renders the label with internal spaces
     (e.g. "Ta x Po in t D at e"), so we fall back to finding the first
     date pattern in the header area (before line items).
     """
-    # Try the clean label first
+    # Old format: "Tax Point Date DD/MM/YYYY"
     match = re.search(
         r"Tax Point Date\s*(\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{2,4})",
         text,
@@ -52,8 +57,18 @@ def _extract_tax_point_date(text: str) -> Optional[str]:
     if match:
         return match.group(1).replace(" ", "")
 
+    # New format: "Credit Note Date" / "Invoice Date" label line,
+    # value on next line after the document number: "23818  26/06/2026  1/1"
+    match = re.search(
+        r"(?:Credit Note Date|Invoice Date)\b[^\n]*\n\s*\d+\s+(\d{1,2}/\d{1,2}/\d{4})",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1)
+
     # Fallback: first date in the header section (before line items)
-    header_match = re.search(r"(.+?)Code\s+Description", text, re.DOTALL | re.IGNORECASE)
+    header_match = re.search(r"(.+?)(?:Code\s+Description|Description\s+Quantity)", text, re.DOTALL | re.IGNORECASE)
     header = header_match.group(1) if header_match else text[:500]
 
     dates = re.findall(r"(\d{1,2}/\s*\d{1,2}/\s*\d{2,4})", header)
@@ -136,6 +151,47 @@ def _extract_vat_analysis(text: str) -> tuple[Optional[float], Optional[float], 
     return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2), total
 
 
+def _extract_vat_analysis_new_format(text: str) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """Parse new-format Hunts Tax Details table.
+
+    Rows look like:  20.00  15.91  3.18  19.09  (Tax%  Net  VAT  Gross)
+    Summary labels:  Total Amount: GBP 19.09
+    """
+    if not re.search(r"Tax Details", text or "", re.IGNORECASE):
+        return None, None, None, None
+
+    vat_net = 0.0
+    nonvat_net = 0.0
+    vat_amount = 0.0
+    found = False
+
+    for m in re.finditer(
+        r"^\s*([\d]+\.[\d]+)\s+([\d,]+\.[\d]{2})\s+([\d,]+\.[\d]{2})\s+([\d,]+\.[\d]{2})\s*$",
+        text,
+        re.MULTILINE,
+    ):
+        rate = float(m.group(1))
+        net_val = parse_money(m.group(2))
+        vat_val = parse_money(m.group(3))
+        if net_val is None:
+            continue
+        found = True
+        if rate > 0:
+            vat_net += net_val
+        else:
+            nonvat_net += net_val
+        if vat_val is not None:
+            vat_amount += vat_val
+
+    total_m = re.search(r"Total Amount:\s*GBP\s*([\d,]+\.[\d]{2})", text, re.IGNORECASE)
+    total = parse_money(total_m.group(1)) if total_m else None
+
+    if not found:
+        return None, None, None, None
+
+    return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2), total
+
+
 def _parse_section(text: str) -> InvoiceData:
     warnings: list[str] = []
     is_credit = bool(re.search(r"Credit\s*(Memo|Note)", text or "", flags=re.IGNORECASE))
@@ -155,7 +211,9 @@ def _parse_section(text: str) -> InvoiceData:
         invoice_date = parse_date("01/01/1970")
     due_date = invoice_date + timedelta(days=30) if invoice_date else None
 
-    vat_net, nonvat_net, vat_amount, total = _extract_vat_analysis(text or "")
+    vat_net, nonvat_net, vat_amount, total = _extract_vat_analysis_new_format(text or "")
+    if vat_net is None:
+        vat_net, nonvat_net, vat_amount, total = _extract_vat_analysis(text or "")
     if vat_net is None:
         warnings.append("VAT net amount not found")
         vat_net = 0.0
@@ -192,8 +250,8 @@ def parse_hunts(text: str) -> list[InvoiceData]:
     if not text:
         return []
     normalized = text.replace("\u2019", "'")
-    # Split on "Hunt's Food Group Ltd" header (page boundaries)
-    starts = [m.start() for m in re.finditer(r"Hunt's Food Group Ltd", normalized)]
+    # Split on Hunts header (page boundaries); handle both old and new branding
+    starts = [m.start() for m in re.finditer(r"Hunt(?:'s)? Food Group", normalized)]
     if not starts:
         return [_parse_section(normalized)]
 
