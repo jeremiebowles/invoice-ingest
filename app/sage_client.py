@@ -71,12 +71,12 @@ def _store_refresh_token(refresh_token: str) -> None:
     # Disable all previous versions so we don't accumulate billable versions.
     new_version_id = new_version.name.split("/")[-1]
     try:
-        for version in client.list_secret_versions(parent=secret_name):
+        for version in client.list_secret_versions(parent=secret_name, filter="state:ENABLED"):
             vid = version.name.split("/")[-1]
-            if vid != new_version_id and version.state.name == "ENABLED":
+            if vid != new_version_id:
                 client.disable_secret_version(name=version.name)
     except Exception:
-        logger.warning("Failed to disable old secret versions; continuing")
+        logger.exception("Failed to disable old secret versions; continuing")
 
 
 def _acquire_token_lock() -> bool:
