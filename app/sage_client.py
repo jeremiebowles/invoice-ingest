@@ -68,15 +68,19 @@ def _store_refresh_token(refresh_token: str) -> None:
         parent=secret_name,
         payload={"data": refresh_token.encode("utf-8")},
     )
-    # Disable all previous versions so we don't accumulate billable versions.
+    # Destroy all previous versions so we don't accumulate billable versions.
+    # (DISABLED versions still count as "active" for Secret Manager billing —
+    # only DESTROYED versions stop being charged.)
     new_version_id = new_version.name.split("/")[-1]
     try:
-        for version in client.list_secret_versions(parent=secret_name, filter="state:ENABLED"):
+        for version in client.list_secret_versions(
+            parent=secret_name, filter="state:ENABLED OR state:DISABLED"
+        ):
             vid = version.name.split("/")[-1]
             if vid != new_version_id:
-                client.disable_secret_version(name=version.name)
+                client.destroy_secret_version(name=version.name)
     except Exception:
-        logger.exception("Failed to disable old secret versions; continuing")
+        logger.exception("Failed to destroy old secret versions; continuing")
 
 
 def _acquire_token_lock() -> bool:
