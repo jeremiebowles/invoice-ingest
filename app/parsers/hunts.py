@@ -38,7 +38,11 @@ def _extract_invoice_number(text: str) -> Optional[str]:
         return match.group(1)
     # New format: "Credit Note Number  Credit Note Date  Page\n23818  26/06/2026  1/1"
     match = re.search(r"(?:Credit Note Number|Invoice Number)\b[^\n]*\n\s*(\d+)", text, re.IGNORECASE)
-    return match.group(1).strip() if match else None
+    if match:
+        return match.group(1).strip()
+    # 2026 format: document opens with "Invoice 75821" or "Credit 27946"
+    match = re.match(r"\s*(?:Invoice|Credit)\s+(\d+)\b", text)
+    return match.group(1) if match else None
 
 
 def _extract_tax_point_date(text: str) -> Optional[str]:
@@ -192,9 +196,57 @@ def _extract_vat_analysis_new_format(text: str) -> tuple[Optional[float], Option
     return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2), total
 
 
+def _extract_vat_summary_table(text: str) -> tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """Parse Hunts 2026-format 'VAT % Net VAT Gross' summary table.
+
+    Rows look like:  0.00 69.77 0.00 69.77  /  20.00 37.26 7.45 44.71
+    (rate  net  vat  gross), with "Net total: GBP x" / "VAT: GBP y" labels
+    interleaved on the same lines, and a trailing "Document Total: GBP z".
+    """
+    header_match = re.search(r"VAT\s*%\s*Net\s*VAT\s*Gross", text, re.IGNORECASE)
+    if not header_match:
+        return None, None, None, None
+
+    tail = text[header_match.end():]
+    end_match = re.search(r"Order Reference|Address:|BACS Payment Details", tail, re.IGNORECASE)
+    section = tail[: end_match.start()] if end_match else tail
+
+    vat_net = 0.0
+    nonvat_net = 0.0
+    vat_amount = 0.0
+    found = False
+
+    for line in section.splitlines():
+        m = re.match(r"\s*(\d+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\b", line)
+        if not m:
+            continue
+        rate = float(m.group(1))
+        net_val = parse_money(m.group(2))
+        vat_val = parse_money(m.group(3))
+        if net_val is None:
+            continue
+        found = True
+        if rate > 0:
+            vat_net += net_val
+        else:
+            nonvat_net += net_val
+        if vat_val is not None:
+            vat_amount += vat_val
+
+    if not found:
+        return None, None, None, None
+
+    total_match = re.search(r"Document Total:?\s*GBP\s*([\d,]+\.\d{2})", section, re.IGNORECASE)
+    total = parse_money(total_match.group(1)) if total_match else None
+
+    return round(vat_net, 2), round(nonvat_net, 2), round(vat_amount, 2), total
+
+
 def _parse_section(text: str) -> InvoiceData:
     warnings: list[str] = []
-    is_credit = bool(re.search(r"Credit\s*(Memo|Note)", text or "", flags=re.IGNORECASE))
+    is_credit = bool(re.search(r"Credit\s*(Memo|Note)", text or "", flags=re.IGNORECASE)) or bool(
+        re.match(r"\s*Credit\s+\d+\b", text or "")
+    )
 
     postcode = _extract_delivery_postcode_hunts(text or "")
     ledger_account = LEDGER_MAP.get(postcode) if postcode else None
@@ -214,6 +266,8 @@ def _parse_section(text: str) -> InvoiceData:
     vat_net, nonvat_net, vat_amount, total = _extract_vat_analysis_new_format(text or "")
     if vat_net is None:
         vat_net, nonvat_net, vat_amount, total = _extract_vat_analysis(text or "")
+    if vat_net is None:
+        vat_net, nonvat_net, vat_amount, total = _extract_vat_summary_table(text or "")
     if vat_net is None:
         warnings.append("VAT net amount not found")
         vat_net = 0.0

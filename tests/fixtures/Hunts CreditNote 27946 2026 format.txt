@@ -1,0 +1,28 @@
+Credit 27946
+Deliver To: Credit Date 17/07/2026
+Customer No BEAHQ
+Beanfreaks (Canton)
+124 Cowbridge Road East Customer VAT Number
+Canton Invoice # 190702
+Cardiff CF11 9DX
+Purchase Order Number
+UNITED KINGDOM
+Site Id BEA900
+Invoice To: Due Date 17/07/2026
+Beanfreaks Ltd Currency GBP
+Cardiff Page 1 of 1
+Wales CF10 1AT
+UNITED KINGDOM
+Item Code Description Quantity Unit RRP (£) Price (£) VAT % Total (£)
+Ambient
+16122 16122 - Paleskin Peanuts 1 5x250g 5.70 0.00 5.70
+VAT % Net VAT Gross Net total: GBP 5.70
+0.00 5.70 0.00 5.70 VAT: GBP 0.00
+Document Total: GBP 5.70
+Invoice # 190702
+Address: Ludbourne Rd Phone: 01935 810210 Bank Name: Barclays Bank PLC
+Sherborne
+Dorset DT9 3NJ E-Mail: creditcontrol@huntsfoodgroup.co.uk Bank Account: 73972097
+UNITED KINGDOM
+VAT No: 813054857 Sort Code: 20-82-94
+Website: www.huntsfoodgroup.co.uk

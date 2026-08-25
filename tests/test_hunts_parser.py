@@ -167,3 +167,80 @@ class TestHuntsInvoice306889:
 
     def test_no_warnings(self):
         assert self.result.warnings == []
+
+
+# ---------------------------------------------------------------------------
+# 2026 layout: "Invoice 75821" / "Credit 27946" header, "VAT % Net VAT
+# Gross" summary table instead of "VAT Analysis" / "Tax Details"
+# ---------------------------------------------------------------------------
+
+class TestHuntsInvoice75821NewLayout:
+    @pytest.fixture(autouse=True)
+    def parse(self):
+        text = _load_fixture("Hunts Invoice 75821 2026 format.txt")
+        self.result = parse_hunts(text)[0]
+
+    def test_invoice_number(self):
+        assert self.result.supplier_reference == "75821"
+
+    def test_invoice_date(self):
+        assert self.result.invoice_date == date(2026, 4, 9)
+
+    def test_not_credit(self):
+        assert self.result.is_credit is False
+
+    def test_postcode(self):
+        assert self.result.deliver_to_postcode == "CF11 9DX"
+
+    def test_ledger_account(self):
+        assert self.result.ledger_account == 5004
+
+    def test_vat_net(self):
+        assert self.result.vat_net == pytest.approx(37.26, abs=0.02)
+
+    def test_nonvat_net(self):
+        assert self.result.nonvat_net == pytest.approx(69.77, abs=0.02)
+
+    def test_vat_amount(self):
+        assert self.result.vat_amount == pytest.approx(7.45, abs=0.02)
+
+    def test_total(self):
+        assert self.result.total == pytest.approx(114.48, abs=0.02)
+
+    def test_no_warnings(self):
+        assert self.result.warnings == []
+
+
+class TestHuntsCreditNote27946NewLayout:
+    @pytest.fixture(autouse=True)
+    def parse(self):
+        text = _load_fixture("Hunts CreditNote 27946 2026 format.txt")
+        self.result = parse_hunts(text)[0]
+
+    def test_invoice_number(self):
+        assert self.result.supplier_reference == "27946"
+
+    def test_invoice_date(self):
+        assert self.result.invoice_date == date(2026, 7, 17)
+
+    def test_is_credit(self):
+        assert self.result.is_credit is True
+
+    def test_postcode(self):
+        assert self.result.deliver_to_postcode == "CF11 9DX"
+
+    def test_ledger_account(self):
+        assert self.result.ledger_account == 5004
+
+    def test_zero_vat(self):
+        assert self.result.vat_net == 0.0
+        assert self.result.vat_amount == 0.0
+
+    def test_nonvat_net(self):
+        assert self.result.nonvat_net == pytest.approx(5.70, abs=0.02)
+
+    def test_total(self):
+        assert self.result.total == pytest.approx(5.70, abs=0.02)
+
+    def test_no_warnings(self):
+        assert self.result.warnings == []

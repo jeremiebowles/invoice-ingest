@@ -1,0 +1,41 @@
+Invoice 75821
+Deliver To: Invoice Date 09/04/2026
+Customer No BEAHQ
+Beanfreaks (Canton)
+124 Cowbridge Road East Customer VAT Number
+Canton
+Purchase Order Number 026161
+Cardiff CF11 9DX
+UNITED KINGDOM Run
+Site Id BEA900
+Invoice To:
+Payment Terms Customer 30 Days End of Month
+Beanfreaks Ltd
+Due Date 30/05/2026
+Cardiff
+Wales CF10 1AT Currency GBP
+UNITED KINGDOM
+Page 1 of 1
+Item Code Description Quantity Unit RRP (£) Price (£) VAT % Total (£)
+Non_Food
+15903 Ecover All In 1 Dishwasher Tablets 2 1x100 31.20 18.63 20.00 37.26
+Frozen
+37077 Quorn Mince 2 1x300g 3.83 2.93 0.00 5.86
+Ambient
+15924 Organic Deluxe Muesli 1 5x500g 3.98 13.07 0.00 13.07
+49342 Hodmedods Roast Fava Beans & Sea Salted 6 1x300g 3.14 2.31 0.00 13.86
+97778 Coarse Bombay Mix 1 5x500g 3.87 13.55 0.00 13.55
+29423 Organic Deluxe Muesli 1 5x1kg 6.69 23.43 0.00 23.43
+VAT % Net VAT Gross
+Net total: GBP 107.03
+0.00 69.77 0.00 69.77
+VAT: GBP 7.45
+20.00 37.26 7.45 44.71
+Document Total: GBP 114.48
+Order Reference 697049
+Address: Ludbourne Rd Phone: 01935 810210 Bank Name: Barclays Bank PLC
+Sherborne
+Dorset DT9 3NJ E-Mail: creditcontrol@huntsfoodgroup.co.uk Bank Account: 73972097
+UNITED KINGDOM
+VAT No: 813054857 Sort Code: 20-82-94
+Website: www.huntsfoodgroup.co.uk
