@@ -608,6 +608,7 @@ def _text_looks_like_hunts(text: str) -> bool:
         or "huntsfoodgroup" in normalized
         or "hub@huntsfoodgroup.co.uk" in normalized
         or "vat no: 813 0548 57" in normalized
+        or "vat no: 813054857" in normalized
     )
 
 
@@ -839,17 +840,6 @@ def _text_looks_like_tonyrefail(text: str) -> bool:
         or "tonyrefailapiary@googlemail.com" in normalized
         or "tonyrefail" in normalized
         or "pure welsh honey" in normalized
-    )
-
-
-def _text_looks_like_hunts(text: str) -> bool:
-    normalized = (text or "").lower()
-    return (
-        "hunt’s food group" in normalized
-        or "hunt's food group" in normalized
-        or "hunts food group" in normalized
-        or "hub@huntsfoodgroup.co.uk" in normalized
-        or "vat no: 813 0548 57" in normalized
     )
 
 
