@@ -74,7 +74,7 @@ def _store_refresh_token(refresh_token: str) -> None:
     new_version_id = new_version.name.split("/")[-1]
     try:
         for version in client.list_secret_versions(
-            parent=secret_name, filter="state:ENABLED OR state:DISABLED"
+            request={"parent": secret_name, "filter": "state:ENABLED OR state:DISABLED"}
         ):
             vid = version.name.split("/")[-1]
             if vid != new_version_id:
