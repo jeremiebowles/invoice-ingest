@@ -1,0 +1,33 @@
+Tax Invoice
+Bill to
+BRECCLES HEALTHCARE LIMITED
+Beanfreaks Cowbridge Road
+84 Newcastle Road
+124, Cowbridge Road East
+Leek
+Canton
+Staffordshire
+Cardiff
+ST13 7AA
+CF11 9DX
+UNITED KINGDOM
+jeremie@beanfreaks.com
+CRN: 08019869
+VAT: 144174916
+07977 440594
+Amount due Due date Issue date Invoice number
+£149.83 28 Sept 2026
+29 Aug 2026 INV-1085
+View online
+Description Quantity Price Tax Amount
+reakiro 1500mg caps 30s (rrp £74.99) 3 41.62 20% 124.86
+reakiro 1500mg caps 30s (rrp £74.99) 1 0.00 0.00
+Subtotal 124.86
+Total VAT 20% 24.97
+Total 149.83
+View online
+Amount due £149.83
+30 days from invoice date
+Please pay by BACS to
+090128
+23454232

@@ -56,6 +56,7 @@ from app.parsers.feel_supreme import parse_feel_supreme
 from app.parsers.blas_ar_fwyd import parse_blas_ar_fwyd
 from app.parsers.crafty_pickle import parse_crafty_pickle
 from app.parsers.cress import parse_cress
+from app.parsers.breccles import parse_breccles
 from app.parsers.dr_organic import parse_dr_organic
 from app.parsers.pravera import parse_pravera
 from app.parsers.sj_may_refrigeration import parse_sj_may_refrigeration
@@ -716,6 +717,14 @@ def _text_looks_like_pravera(text: str) -> bool:
     return (
         "pravera" in normalized
         or "774644105" in normalized
+    )
+
+
+def _text_looks_like_breccles(text: str) -> bool:
+    normalized = (text or "").lower()
+    return (
+        "breccles healthcare" in normalized
+        or "vat: 144174916" in normalized
     )
 
 
@@ -2029,6 +2038,8 @@ def _detect_and_parse(
         return [parse_pravera(text)]
     elif _text_looks_like_dr_organic(text):
         return [parse_dr_organic(text)]
+    elif _text_looks_like_breccles(text):
+        return [parse_breccles(text)]
     else:
         logger.warning("No supplier parser matched", extra={"sender": sender_email, "attachment": attachment_name})
         if raise_on_unknown:
