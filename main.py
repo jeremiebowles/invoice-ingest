@@ -313,6 +313,22 @@ def _serialize_for_storage(value: Any) -> Any:
     return value
 
 
+def _parse_payload_date(raw: Any, field: str) -> Optional[date]:
+    if raw is None or raw == "":
+        return None
+    text = str(raw)
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", text):
+        try:
+            parsed = date.fromisoformat(text)
+        except ValueError:
+            parsed = None
+    else:
+        parsed = parse_date(text)
+    if not parsed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field}")
+    return parsed
+
+
 def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
     supplier_reference = payload.get("supplier_reference")
     invoice_date_raw = payload.get("invoice_date")
@@ -322,16 +338,7 @@ def _invoice_from_payload(payload: Dict[str, Any]) -> InvoiceData:
             detail="Missing supplier_reference or invoice_date",
         )
 
-    invoice_date_text = str(invoice_date_raw)
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", invoice_date_text):
-        try:
-            invoice_date = date.fromisoformat(invoice_date_text)
-        except ValueError:
-            invoice_date = None
-    else:
-        invoice_date = parse_date(invoice_date_text)
-    if not invoice_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid invoice_date")
+    invoice_date = _parse_payload_date(invoice_date_raw, "invoice_date")
 
     vat_net = float(payload.get("vat_net", 0) or 0)
     nonvat_net = float(payload.get("nonvat_net", 0) or 0)
@@ -1189,6 +1196,7 @@ async def sage_post(request: Request) -> Dict[str, Any]:
             logger.exception("Failed to reserve message_id; continuing")
 
     invoice = _invoice_from_payload(payload)
+    due_date = _parse_payload_date(payload.get("due_date"), "due_date")
 
     record_id = None
     if FIRESTORE_ENABLED:
@@ -1226,9 +1234,9 @@ async def sage_post(request: Request) -> Dict[str, Any]:
                     update_record(record_id, {"status": "skipped", "sage": skip, "duplicate": duplicate})
                 return {"status": "ok", "sage": skip, "record_id": record_id}
         if invoice.is_credit:
-            sage_result = post_purchase_credit_note(invoice)
+            sage_result = post_purchase_credit_note(invoice, due_date)
         else:
-            sage_result = post_purchase_invoice(invoice)
+            sage_result = post_purchase_invoice(invoice, due_date)
     except Exception as exc:
         logger.exception("Sage post failed: %s", exc)
         if record_id:

@@ -28,6 +28,7 @@ _ATTACHMENT_CONTEXT_TYPES = {
     "purchase_credit_note": "PURCHASE_CREDIT_NOTE",
 }
 _ATTACHMENT_CONTEXT_TYPE_IDS: dict[str, str] = {}
+_LEDGER_ACCOUNT_IDS: dict[int, str] = {}
 
 
 def _get_env(name: str) -> Optional[str]:
@@ -316,7 +317,11 @@ def exchange_auth_code(code: str, redirect_uri: str = "https://oauth.pstmn.io/v1
     return data
 
 
-def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
+def _get_ledger_account_id(
+    invoice: InvoiceData,
+    access_token: Optional[str] = None,
+    business_id: Optional[str] = None,
+) -> Optional[str]:
     if invoice.ledger_account == 5001:
         return _get_env("SAGE_LEDGER_5001_ID")
     if invoice.ledger_account == 5002:
@@ -327,6 +332,40 @@ def _get_ledger_account_id(invoice: InvoiceData) -> Optional[str]:
         return _get_env("SAGE_LEDGER_7127_ID")
     if invoice.ledger_account == 7801:
         return _get_env("SAGE_LEDGER_7801_ID")
+    if invoice.ledger_account and access_token and business_id:
+        return _lookup_ledger_account_id(access_token, business_id, int(invoice.ledger_account))
+    return None
+
+
+def _lookup_ledger_account_id(access_token: str, business_id: str, nominal_code: int) -> Optional[str]:
+    """Find a ledger account's Sage ID by its nominal code (e.g. 7100)."""
+    cached = _LEDGER_ACCOUNT_IDS.get(nominal_code)
+    if cached:
+        return cached
+    suffix = f"({nominal_code})"
+    for params in (
+        {"search": str(nominal_code), "attributes": "nominal_code", "items_per_page": 200},
+        {"attributes": "nominal_code", "items_per_page": 200},
+    ):
+        resp = requests.get(
+            f"{SAGE_API_BASE}/ledger_accounts",
+            headers=_sage_headers(access_token, business_id),
+            params=params,
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            logger.info("Ledger account lookup %s: HTTP %s", params, resp.status_code)
+            continue
+        for item in resp.json().get("$items") or []:
+            if not isinstance(item, dict):
+                continue
+            code = item.get("nominal_code")
+            displayed = str(item.get("displayed_as") or "").strip()
+            if str(code) == str(nominal_code) or displayed.endswith(suffix):
+                ledger_id = item.get("id")
+                if ledger_id:
+                    _LEDGER_ACCOUNT_IDS[nominal_code] = ledger_id
+                    return ledger_id
     return None
 
 
@@ -576,21 +615,21 @@ def find_sage_invoice_id(reference: str, is_credit: bool = False) -> Optional[st
     return None
 
 
-def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
+def post_purchase_invoice(invoice: InvoiceData, due_date: Optional[date] = None) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
     contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")
     if not business_id or not contact_id:
         raise RuntimeError("Missing Sage business/contact configuration")
 
-    ledger_account_id = _get_ledger_account_id(invoice)
+    access_token = _refresh_access_token()
+    ledger_account_id = _get_ledger_account_id(invoice, access_token, business_id)
     if not ledger_account_id:
         raise RuntimeError("Missing Sage ledger account mapping")
 
-    access_token = _refresh_access_token()
     invoice_lines, net_amount, vat_amount, total_amount = _build_invoice_lines(
         invoice, ledger_account_id
     )
-    due_date = _compute_due_date(invoice.invoice_date)
+    due_date = due_date or _compute_due_date(invoice.invoice_date)
 
     if _already_exists(
         access_token,
@@ -647,21 +686,21 @@ def post_purchase_invoice(invoice: InvoiceData) -> Dict[str, Any]:
     return result
 
 
-def post_purchase_credit_note(invoice: InvoiceData) -> Dict[str, Any]:
+def post_purchase_credit_note(invoice: InvoiceData, due_date: Optional[date] = None) -> Dict[str, Any]:
     business_id = _get_env("SAGE_BUSINESS_ID")
     contact_id = invoice.contact_id or _get_env("SAGE_CONTACT_ID")
     if not business_id or not contact_id:
         raise RuntimeError("Missing Sage business/contact configuration")
 
-    ledger_account_id = _get_ledger_account_id(invoice)
+    access_token = _refresh_access_token()
+    ledger_account_id = _get_ledger_account_id(invoice, access_token, business_id)
     if not ledger_account_id:
         raise RuntimeError("Missing Sage ledger account mapping")
 
-    access_token = _refresh_access_token()
     invoice_lines, net_amount, vat_amount, total_amount = _build_invoice_lines(
         invoice, ledger_account_id
     )
-    due_date = _compute_due_date(invoice.invoice_date)
+    due_date = due_date or _compute_due_date(invoice.invoice_date)
 
     if _already_exists(
         access_token,
