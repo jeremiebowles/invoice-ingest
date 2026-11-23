@@ -1478,6 +1478,71 @@ async def sage_lookup_invoice(request: Request, sage_id: str) -> Dict[str, Any]:
     return {"status": "ok", "sage_id": sage_id, "reference": d.get("reference"), "vendor_reference": d.get("vendor_reference"), "contact": (d.get("contact") or {}).get("displayed_as"), "total": d.get("total_amount"), "date": d.get("date"), "invoice_status": (d.get("status") or {}).get("id")}
 
 
+@app.get("/sage/contact-invoices")
+async def sage_contact_invoices(
+    request: Request,
+    contact_id: str,
+    from_date: str,
+    to_date: str,
+    credits: bool = False,
+) -> Dict[str, Any]:
+    """Read-only: list a contact's purchase invoices (or credit notes) in a date range.
+
+    Used for statement reconciliation when invoices were entered without a
+    searchable reference.
+    """
+    from app.sage_client import _refresh_access_token, _sage_headers, SAGE_API_BASE, _get_env
+    import requests as _req
+    _check_basic_auth(request)
+    if not SAGE_ENABLED:
+        return {"status": "disabled"}
+    try:
+        date.fromisoformat(from_date)
+        date.fromisoformat(to_date)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="from_date and to_date must be YYYY-MM-DD",
+        ) from exc
+    access_token = _refresh_access_token()
+    business_id = _get_env("SAGE_BUSINESS_ID")
+    headers = _sage_headers(access_token, business_id)
+    endpoint = "purchase_credit_notes" if credits else "purchase_invoices"
+    params: Optional[Dict[str, Any]] = {
+        "contact_id": contact_id.strip(),
+        "from_date": from_date,
+        "to_date": to_date,
+        "items_per_page": 200,
+        "attributes": "date,reference,vendor_reference,total_amount,status,contact",
+    }
+    url: Optional[str] = f"{SAGE_API_BASE}/{endpoint}"
+    items: list[Dict[str, Any]] = []
+    for _ in range(10):  # page cap
+        if not url:
+            break
+        resp = _req.get(url, headers=headers, params=params, timeout=30)
+        if resp.status_code >= 400:
+            return {"status": "error", "http_status": resp.status_code, "body": resp.text[:500]}
+        data = resp.json()
+        for it in data.get("$items") or []:
+            items.append(
+                {
+                    "id": it.get("id"),
+                    "date": it.get("date"),
+                    "reference": it.get("reference"),
+                    "vendor_reference": it.get("vendor_reference"),
+                    "displayed_as": it.get("displayed_as"),
+                    "total": it.get("total_amount"),
+                    "status": (it.get("status") or {}).get("id"),
+                    "contact": (it.get("contact") or {}).get("displayed_as"),
+                }
+            )
+        nxt = data.get("$next")
+        url = f"{SAGE_API_BASE}{nxt}" if nxt and nxt.startswith("/") else nxt
+        params = None
+    return {"status": "ok", "endpoint": endpoint, "count": len(items), "items": items}
+
+
 @app.get("/sage/debug-businesses")
 async def sage_debug_businesses(request: Request) -> Dict[str, Any]:
     """Check what Sage businesses the token has access to and what SAGE_BUSINESS_ID is set to."""
